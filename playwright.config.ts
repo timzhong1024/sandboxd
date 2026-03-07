@@ -15,7 +15,7 @@ export default defineConfig({
   },
   webServer: [
     {
-      command: `HOST=127.0.0.1 PORT=${serverPort} pnpm --filter @sandboxd/server dev`,
+      command: `HOST=127.0.0.1 PORT=${serverPort} SANDBOXD_USE_FIXTURE=1 pnpm --filter @sandboxd/server dev`,
       url: `http://127.0.0.1:${serverPort}/healthz`,
       reuseExistingServer: !process.env.CI,
       stdout: "pipe",
