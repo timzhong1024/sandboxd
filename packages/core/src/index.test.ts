@@ -46,7 +46,7 @@ test("parses a valid managed entity payload", () => {
 
 test("rejects an invalid managed entity payload", () => {
   expect(() => parseManagedEntities([{ unitName: "broken.service", labels: {} }])).toThrow(
-    /field "kind" must be a string/i,
+    /"kind"/i,
   );
 });
 

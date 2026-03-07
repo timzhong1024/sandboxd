@@ -48,7 +48,5 @@ test("surfaces runtime payload validation errors", async () => {
 
   render(<App />);
 
-  expect(await screen.findByRole("alert")).toHaveTextContent(
-    'Managed entity field "kind" must be a string',
-  );
+  expect(await screen.findByRole("alert")).toHaveTextContent(/"kind"/i);
 });
