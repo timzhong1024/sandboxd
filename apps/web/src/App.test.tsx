@@ -38,3 +38,19 @@ test("renders entities returned by the server", async () => {
   expect(screen.getByText("sandbox-service")).toBeInTheDocument();
   expect(screen.getByText("sandboxd")).toBeInTheDocument();
 });
+
+test("surfaces runtime payload validation errors", async () => {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => [{ unitName: "broken.service", labels: {} }],
+    }),
+  );
+
+  render(<App />);
+
+  expect(await screen.findByRole("alert")).toHaveTextContent(
+    'Managed entity field "kind" must be a string',
+  );
+});

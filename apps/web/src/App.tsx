@@ -1,5 +1,5 @@
 import type { ManagedEntity } from "@sandboxd/core";
-import { isSandboxdManaged } from "@sandboxd/core";
+import { isSandboxdManaged, parseManagedEntities } from "@sandboxd/core";
 import { useEffect, useState } from "react";
 
 async function loadEntities(): Promise<ManagedEntity[]> {
@@ -8,7 +8,7 @@ async function loadEntities(): Promise<ManagedEntity[]> {
     throw new Error(`Failed to load entities: ${response.status}`);
   }
 
-  return response.json() as Promise<ManagedEntity[]>;
+  return parseManagedEntities(await response.json());
 }
 
 export function App() {
