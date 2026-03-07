@@ -194,6 +194,59 @@ flowchart LR
 
 V1 不承诺数据库，也不承诺自定义 agent runtime。所有复杂度都优先压进 systemd 原语和少量附加元数据。
 
+### runtime-systemd 演进策略
+
+当前 runtime adapter 仍然允许使用 `systemctl`，但长期方向不是继续围绕 stdout 文本做复杂解析，而是把读路径逐步迁到更结构化的 systemd 接口。
+
+默认演进路径：
+
+1. 稳定 `SystemdRuntimePort`
+2. 保持上层 use-case / transport 不感知底层实现
+3. 短期用 `systemctl`
+4. 中期做 D-Bus adapter spike
+5. 验证稳定后再切换默认读路径
+
+建议中的 runtime 分层：
+
+```mermaid
+flowchart LR
+  A["web / cli / mcp"] --> B["server use-cases"]
+  B --> C["SystemdRuntimePort"]
+
+  C --> D["systemctl runtime (current)"]
+  C --> E["dbus runtime (future)"]
+
+  D --> D1["list-units stdout parser"]
+  D --> D2["systemctl show"]
+  D --> D3["systemctl start/stop/restart"]
+
+  E --> E1["Manager.ListUnits"]
+  E --> E2["GetUnit + Properties.GetAll"]
+  E --> E3["StartUnit/StopUnit/RestartUnit"]
+```
+
+当前默认策略：
+
+- `list` 可以暂时继续使用 `systemctl list-units`
+- `inspect` 应优先往 `systemctl show` 的结构化属性读取收敛
+- `start` / `stop` / `restart` 可以继续通过 `systemctl` 执行
+- 不要继续扩大“整行 stdout 正则解析”承担的职责范围
+
+关于 `dbus-next`：
+
+- 可以作为 Node 侧 D-Bus adapter 的候选实现
+- 现阶段不把“迁移到 dbus-next”本身当作里程碑
+- 优先迁移的是 runtime 边界，而不是先绑定到某个具体库
+
+推荐的实施顺序：
+
+1. 先让 `systemctl` adapter 内部稳定产出统一的 `SystemdUnitRecord` / `SystemdUnitDetailRecord`
+2. 再增加一个并行的 D-Bus adapter，只先覆盖 `getUnit()`
+3. D-Bus 详情读取稳定后，再扩到 `listUnits()`
+4. 最后再评估是否把动作接口也切到 D-Bus method call
+
+这个顺序的目标是降低风险：先用 D-Bus 解决最适合结构化读取的 `inspect`，而不是一开始就全面替换现有 runtime。
+
 ### 当前代码分层
 
 为了降低技术债并提高 AI 并行开发效率，当前代码默认按以下方向拆分：

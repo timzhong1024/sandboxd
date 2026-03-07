@@ -58,6 +58,15 @@ Sandboxd 是一个 systemd-first 的 homelab sandbox manager。
 - 如果运行环境不是 Linux，或者 `systemctl` 不可用，则自动退回 fixture inventory
 - 不要为了让本机开发通过而去删除这层降级；它是当前跨平台开发的必要支撑
 
+当前 runtime-systemd 演进默认决策：
+
+- 不把“迁移到 `dbus-next`”本身当成目标；优先稳定 runtime port 边界
+- 短期保留 `systemctl list-units` 做 inventory
+- `inspect` 优先向 `systemctl show` 的结构化属性读取收敛
+- `start` / `stop` / `restart` 继续允许走 `systemctl`
+- 后续如果做 D-Bus spike，先只覆盖 `getUnit()`，不要一开始全面替换全部 runtime
+- 如果未来引入 `dbus-next`，把它放在 `SystemdRuntimePort` 后面作为一个可切换 adapter，而不是把 D-Bus 细节扩散到 use-case / web / core
+
 ## 当前分层约束
 
 为了提高 agent 并行开发效率，当前代码默认遵守以下分层：
