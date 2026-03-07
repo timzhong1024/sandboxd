@@ -7,6 +7,7 @@ import { z } from "zod";
 import {
   managedEntityFixtureNames,
   type ManagedEntityFixtureName,
+  type ManagedEntityMetadataRecord,
   type ManagedEntityMetadataSourcePort,
 } from "../../ports/managed-entity-metadata-source-port";
 
@@ -149,8 +150,26 @@ export function createFixtureMetadataSource(
   }
 
   return {
+    async deleteManagedEntityMetadata() {},
+    async getManagedEntityMetadata(): Promise<ManagedEntityMetadataRecord | null> {
+      return null;
+    },
     async listFallbackEntitySummaries({ fixtureName = defaultFixtureName } = {}) {
       return getFixture(fixtureName).map((entity) => toSummary(cloneEntity(entity)));
+    },
+    async listManagedEntityMetadata(): Promise<ManagedEntityMetadataRecord[]> {
+      return [];
+    },
+    async saveManagedEntityMetadata(unitName, input) {
+      return compactMetadataRecord({
+        unitName,
+        description: input.description,
+        workingDirectory: input.workingDirectory,
+        slice: input.slice ?? "sandboxd.slice",
+        sandboxProfile: input.sandboxProfile,
+        resourceControls: { ...input.resourceControls },
+        sandboxing: { ...input.sandboxing },
+      });
     },
     async getFallbackEntityDetail(unitName, { fixtureName = defaultFixtureName } = {}) {
       const entity = getFixture(fixtureName).find((item) => item.unitName === unitName);
@@ -223,4 +242,35 @@ export function parseFixtureName(value: string | undefined): ManagedEntityFixtur
   }
 
   return fixtureNameSchema.parse(value);
+}
+
+function compactMetadataRecord(record: {
+  description: string | undefined;
+  resourceControls: ManagedEntityMetadataRecord["resourceControls"];
+  sandboxProfile: string | undefined;
+  sandboxing: ManagedEntityMetadataRecord["sandboxing"];
+  slice: string;
+  unitName: string;
+  workingDirectory: string | undefined;
+}): ManagedEntityMetadataRecord {
+  const next: ManagedEntityMetadataRecord = {
+    unitName: record.unitName,
+    slice: record.slice,
+    resourceControls: record.resourceControls,
+    sandboxing: record.sandboxing,
+  };
+
+  if (record.description) {
+    next.description = record.description;
+  }
+
+  if (record.workingDirectory) {
+    next.workingDirectory = record.workingDirectory;
+  }
+
+  if (record.sandboxProfile) {
+    next.sandboxProfile = record.sandboxProfile;
+  }
+
+  return next;
 }

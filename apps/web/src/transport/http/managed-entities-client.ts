@@ -12,12 +12,12 @@ export function createManagedEntitiesHttpClient(): ManagedEntitiesClientPort {
   return {
     async loadManagedEntities(): Promise<ManagedEntitySummary[]> {
       const response = await fetch("/api/entities");
-      assertOk(response, "Failed to load entities");
+      await assertOk(response, "Failed to load entities");
       return parseManagedEntitySummaries(await response.json());
     },
     async loadManagedEntity(unitName: string): Promise<ManagedEntityDetail> {
       const response = await fetch(`/api/entities/${encodeURIComponent(unitName)}`);
-      assertOk(response, `Failed to load entity: ${unitName}`);
+      await assertOk(response, `Failed to load entity: ${unitName}`);
       return parseManagedEntityDetail(await response.json());
     },
     async startManagedEntity(unitName: string): Promise<ManagedEntityDetail> {
@@ -38,7 +38,7 @@ export function createManagedEntitiesHttpClient(): ManagedEntitiesClientPort {
         },
         body: JSON.stringify(validatedInput),
       });
-      assertOk(response, "Failed to create sandbox service");
+      await assertOk(response, "Failed to create sandbox service");
       return parseManagedEntityDetail(await response.json());
     },
   };
@@ -51,12 +51,15 @@ async function postEntityAction(
   const response = await fetch(`/api/entities/${encodeURIComponent(unitName)}/${action}`, {
     method: "POST",
   });
-  assertOk(response, `Failed to ${action} entity: ${unitName}`);
+  await assertOk(response, `Failed to ${action} entity: ${unitName}`);
   return parseManagedEntityDetail(await response.json());
 }
 
-function assertOk(response: Response, message: string) {
+async function assertOk(response: Response, message: string) {
   if (!response.ok) {
-    throw new Error(`${message}: ${response.status}`);
+    const payload = (await response.json().catch(() => null)) as { error?: string } | null;
+    throw new Error(
+      payload?.error ? `${message}: ${payload.error}` : `${message}: ${response.status}`,
+    );
   }
 }

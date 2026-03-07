@@ -5,10 +5,40 @@ import { App } from "./App";
 beforeEach(() => {
   vi.stubGlobal(
     "fetch",
-    vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => [
-        {
+    vi.fn().mockImplementation(async (input: RequestInfo | URL) => {
+      const url = input.toString();
+
+      if (url === "/api/entities") {
+        return {
+          ok: true,
+          json: async () => [
+            {
+              kind: "sandbox-service",
+              origin: "sandboxd",
+              unitName: "lab-api.service",
+              unitType: "service",
+              state: "active",
+              subState: "running",
+              loadState: "loaded",
+              slice: "sandboxd.slice",
+              labels: {
+                stack: "lab",
+              },
+              sandboxProfile: "strict",
+              capabilities: {
+                canInspect: true,
+                canStart: false,
+                canStop: true,
+                canRestart: true,
+              },
+            },
+          ],
+        };
+      }
+
+      return {
+        ok: true,
+        json: async () => ({
           kind: "sandbox-service",
           origin: "sandboxd",
           unitName: "lab-api.service",
@@ -27,8 +57,19 @@ beforeEach(() => {
             canStop: true,
             canRestart: true,
           },
-        },
-      ],
+          resourceControls: {
+            cpuWeight: "200",
+          },
+          sandboxing: {
+            noNewPrivileges: true,
+          },
+          status: {
+            activeState: "active",
+            subState: "running",
+            loadState: "loaded",
+          },
+        }),
+      };
     }),
   );
 });
@@ -40,12 +81,13 @@ afterEach(() => {
 test("renders entities returned by the server", async () => {
   render(<App />);
 
-  expect(await screen.findByText("lab-api.service")).toBeInTheDocument();
+  expect(await screen.findAllByText("lab-api.service")).toHaveLength(2);
   expect(screen.getByText("sandbox-service")).toBeInTheDocument();
-  expect(screen.getByText("sandboxd")).toBeInTheDocument();
+  expect(screen.getAllByText("sandboxd")).toHaveLength(2);
   expect(
     screen.getByText("A homelab control surface with the feel of a compact appliance."),
   ).toBeInTheDocument();
+  expect(await screen.findByText("Resource controls")).toBeInTheDocument();
 });
 
 test("surfaces runtime payload validation errors", async () => {

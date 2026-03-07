@@ -1,11 +1,25 @@
 import { spawn } from "node:child_process";
-import type { Sandboxing, SystemdUnitDetailRecord, SystemdUnitRecord } from "@sandboxd/core";
+import { mkdir, writeFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
+import type {
+  CreateSandboxServiceInput,
+  Sandboxing,
+  SystemdUnitDetailRecord,
+  SystemdUnitRecord,
+} from "@sandboxd/core";
 import type { SystemdRuntimePort } from "../../ports/systemd-runtime-port";
 
 const listUnitsArgs = ["list-units", "--all", "--plain", "--no-legend", "--no-pager"];
 
 export function createSystemctlRuntime(): SystemdRuntimePort {
   return {
+    async createSandboxService(unitName, input) {
+      ensureSystemctlAvailable();
+      const unitPath = getUnitFilePath(unitName);
+      await mkdir(dirname(unitPath), { recursive: true });
+      await writeFile(unitPath, renderSandboxServiceUnitFile(unitName, input), "utf8");
+      await runSystemctl(["daemon-reload"]);
+    },
     async listUnits() {
       ensureSystemctlAvailable();
       const stdout = await runSystemctl(listUnitsArgs);
@@ -118,6 +132,117 @@ export function parseSystemctlShowOutput(stdout: string): SystemdUnitDetailRecor
     },
     sandboxing: parseSandboxing(values),
   };
+}
+
+export function getUnitFilePath(unitName: string, environment: NodeJS.ProcessEnv = process.env) {
+  const unitDir = environment.SANDBOXD_SYSTEMD_UNIT_DIR ?? "/etc/systemd/system";
+  return join(unitDir, unitName);
+}
+
+export function renderSandboxServiceUnitFile(
+  unitName: string,
+  input: CreateSandboxServiceInput,
+): string {
+  const lines = [
+    "[Unit]",
+    `Description=${escapeUnitValue(input.description ?? `Sandboxd managed ${unitName}`)}`,
+    "",
+    "[Service]",
+    "Type=simple",
+    `ExecStart=${input.execStart}`,
+    input.workingDirectory ? `WorkingDirectory=${escapeUnitValue(input.workingDirectory)}` : null,
+    input.slice ? `Slice=${escapeUnitValue(input.slice)}` : "Slice=sandboxd.slice",
+    renderEnvironmentLines(input.environment),
+    renderResourceControlLines(input.resourceControls),
+    renderSandboxingLines(resolveSandboxingDefaults(input)),
+    "",
+    "[Install]",
+    "WantedBy=multi-user.target",
+    "",
+  ];
+
+  return lines
+    .flat()
+    .filter((line): line is string => line !== null && line !== "")
+    .join("\n");
+}
+
+function renderEnvironmentLines(environment: Record<string, string> | undefined) {
+  if (!environment) {
+    return [];
+  }
+
+  return Object.entries(environment)
+    .sort(([left], [right]) => left.localeCompare(right))
+    .map(([key, value]) => `Environment=${key}=${escapeEnvironmentValue(value)}`);
+}
+
+function renderResourceControlLines(
+  resourceControls: CreateSandboxServiceInput["resourceControls"],
+) {
+  if (!resourceControls) {
+    return [];
+  }
+
+  return [
+    resourceControls.cpuWeight ? `CPUWeight=${resourceControls.cpuWeight}` : null,
+    resourceControls.memoryMax ? `MemoryMax=${resourceControls.memoryMax}` : null,
+    resourceControls.tasksMax ? `TasksMax=${resourceControls.tasksMax}` : null,
+  ].filter((line): line is string => Boolean(line));
+}
+
+function renderSandboxingLines(sandboxing: Sandboxing) {
+  return [
+    sandboxing.noNewPrivileges !== undefined
+      ? `NoNewPrivileges=${sandboxing.noNewPrivileges ? "yes" : "no"}`
+      : null,
+    sandboxing.privateTmp !== undefined
+      ? `PrivateTmp=${sandboxing.privateTmp ? "yes" : "no"}`
+      : null,
+    sandboxing.protectSystem ? `ProtectSystem=${sandboxing.protectSystem}` : null,
+    sandboxing.protectHome !== undefined
+      ? `ProtectHome=${sandboxing.protectHome ? "yes" : "no"}`
+      : null,
+  ].filter((line): line is string => Boolean(line));
+}
+
+function resolveSandboxingDefaults(input: CreateSandboxServiceInput): Sandboxing {
+  const profileDefaults = getSandboxProfileDefaults(input.sandboxProfile);
+
+  return {
+    ...profileDefaults,
+    ...input.sandboxing,
+  };
+}
+
+function getSandboxProfileDefaults(profile: string | undefined): Sandboxing {
+  if (profile === "strict") {
+    return {
+      noNewPrivileges: true,
+      privateTmp: true,
+      protectSystem: "strict",
+      protectHome: true,
+    };
+  }
+
+  if (profile === "baseline") {
+    return {
+      noNewPrivileges: true,
+      privateTmp: true,
+      protectSystem: "full",
+      protectHome: false,
+    };
+  }
+
+  return {};
+}
+
+function escapeEnvironmentValue(value: string) {
+  return JSON.stringify(value);
+}
+
+function escapeUnitValue(value: string) {
+  return value.replaceAll("\n", " ").trim();
 }
 
 function parseSandboxing(values: Map<string, string>): Sandboxing {

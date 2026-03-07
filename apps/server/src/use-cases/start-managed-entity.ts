@@ -2,6 +2,7 @@ import type { ManagedEntityDetail } from "@sandboxd/core";
 import type { ManagedEntityMetadataSourcePort } from "../ports/managed-entity-metadata-source-port";
 import type { SystemdRuntimePort } from "../ports/systemd-runtime-port";
 import { createInspectManagedEntity } from "./inspect-managed-entity";
+import { ManagedEntityConflictError } from "./managed-entity-errors";
 import { shouldFallbackToMetadata } from "./systemd-runtime-fallback";
 
 interface CreateStartManagedEntityOptions {
@@ -19,9 +20,12 @@ export function createStartManagedEntity({
   });
 
   return async function startManagedEntity(unitName: string): Promise<ManagedEntityDetail> {
+    const entity = await inspectManagedEntity(unitName);
+    if (!entity.capabilities.canStart) {
+      throw new ManagedEntityConflictError(`Managed entity cannot be started: ${unitName}`);
+    }
+
     try {
-      // Stage 1 keeps action routing minimal and does not enforce capabilities yet.
-      // Known gap: callers can still invoke actions on entities whose contract says the action is unavailable.
       await systemdRuntime.startUnit(unitName);
       return await inspectManagedEntity(unitName);
     } catch (error: unknown) {

@@ -1,6 +1,8 @@
 import { mapSystemdUnitDetailRecord, type ManagedEntityDetail } from "@sandboxd/core";
 import type { ManagedEntityMetadataSourcePort } from "../ports/managed-entity-metadata-source-port";
 import type { SystemdRuntimePort } from "../ports/systemd-runtime-port";
+import { mergeDetailWithMetadata } from "./managed-entity-metadata";
+import { ManagedEntityNotFoundError } from "./managed-entity-errors";
 import { shouldFallbackToMetadata } from "./systemd-runtime-fallback";
 
 interface CreateInspectManagedEntityOptions {
@@ -16,7 +18,8 @@ export function createInspectManagedEntity({
     try {
       const record = await systemdRuntime.getUnit(unitName);
       if (record) {
-        return mapSystemdUnitDetailRecord(record);
+        const metadata = await metadataSource.getManagedEntityMetadata(unitName);
+        return mergeDetailWithMetadata(mapSystemdUnitDetailRecord(record), metadata);
       }
     } catch (error: unknown) {
       if (!shouldFallbackToMetadata(error)) {
@@ -25,12 +28,12 @@ export function createInspectManagedEntity({
 
       const fallbackEntity = await metadataSource.getFallbackEntityDetail(unitName);
       if (!fallbackEntity) {
-        throw new Error(`Managed entity not found: ${unitName}`);
+        throw new ManagedEntityNotFoundError(`Managed entity not found: ${unitName}`);
       }
 
       return fallbackEntity;
     }
 
-    throw new Error(`Managed entity not found: ${unitName}`);
+    throw new ManagedEntityNotFoundError(`Managed entity not found: ${unitName}`);
   };
 }
