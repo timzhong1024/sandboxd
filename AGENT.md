@@ -176,6 +176,17 @@ V2 高级模式的当前默认约束：
 - 已支持的原生属性走 `advancedProperties`
 - unit / drop-in 中检测到但当前未支持结构化编辑的 `Service` 指令，走 `unknownSystemdDirectives`
 - 未知属性不能静默丢失；至少要在 inspect 结果中保留并在 UI 中明确展示为“已检测到但暂不支持”
+- 单属性 grammar parsing 已经集中到 `packages/core` 的 parser registry；不要再把解析逻辑散回 `control-plane` / `web` / `mcp`
+- 当前数据形状已经固定：
+  - 标量属性：`{ parsed?, raw? }`
+  - 可重复属性：`Array<{ parsed?, raw? }>`
+- `zod transform` 只负责单属性从 `string` 到结构化值的 grammar parsing
+- sibling-level validation、warning、profile merge、drift 判断继续留在外置逻辑，不要硬塞回单属性 parser
+- 分层职责固定为三层：
+  - `grammar parser`：只解析单条 value，不处理多次出现和 sibling 语义
+  - `merge`：只处理同 key 多次出现时怎么折叠
+  - `validation / normalization`：只处理 sibling 依赖、隐式效果、warning、profile merge、drift
+- 后续如果遇到“这个属性能 parse，但组合起来不合理”的情况，优先补 `validation / normalization`，不要反手把语义规则塞回单属性 parser
 
 ## 当前技术约束
 
@@ -203,10 +214,12 @@ V2 高级模式的当前默认约束：
 后续开发默认按这个顺序推进：
 
 1. 继续收紧 `packages/control-plane` 的边界，不要让后端逻辑回流进 `apps/server`。
-2. 用真实 metadata 进一步替换 `kind` / `origin` 的启发式识别。
-3. 保持 `/mcp` 无状态；不要引入 stateful streamable HTTP，后续只补必要的 observability。
-4. 继续完善 CLI/MCP 的错误语义和使用体验。
-5. 最后再考虑 `runtime-systemd` 单独拆包。
+2. 在高级属性层先补 object-level validation / warning，不要直接跳到 Web 表单。
+3. 再用 property registry 驱动 WebUI 高级模式和 MCP 说明，避免手写第二套属性定义。
+4. 然后补高级属性的 create / update round-trip 写路径。
+5. 保持 `/mcp` 无状态；不要引入 stateful streamable HTTP，后续只补必要的 observability。
+6. 继续完善 CLI/MCP 的错误语义和使用体验。
+7. 最后再考虑 `runtime-systemd` 单独拆包。
 
 ## 工作方式
 

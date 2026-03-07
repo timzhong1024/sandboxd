@@ -421,12 +421,28 @@ POST /mcp
 - `WorkingDirectory`
 - `Environment`
 
+这批基础设施当前已经落地到代码中，作为后续 V2 推进的固定起点：
+
+- 单属性 grammar parsing 已收敛到 `packages/core` 的共享 parser registry
+- parser 采用 zod transform，把单条 directive value 从 `string` 解析成结构化值
+- 标量属性使用 `{ parsed?, raw? }`
+- 可重复属性使用 `Array<{ parsed?, raw? }>`
+- `Environment=` 采用 parsed/raw 双态，能结构化就给 `parsed`，不能安全结构化就保留 `raw`
+- sibling-level 的组合校验、冲突检测和 warning 继续留在 parser 之外，由后续 validation 层统一处理
+
 未知属性兜底策略也同时固定：
 
 - 已支持属性走结构化字段 `advancedProperties`
 - 未支持但在 unit / drop-in 中检测到的原生 `Service` 指令，保存在 `unknownSystemdDirectives`
 - WebUI 后续应把这类字段标成“检测到但当前不支持结构化编辑”，而不是静默丢弃
 - MCP 不直接内嵌整份 systemd 文档，而是按需提供属性目录和单项说明
+
+基于这次重构，第二阶段后续默认按这个顺序推进：
+
+1. 先补 object-level validation / warning，把 sibling-level 约束从 ad-hoc 逻辑收敛成可复用规则。
+2. 再做 WebUI 高级模式表单，统一由 property registry 驱动控件、说明和默认展示分组。
+3. 然后补 create / update 写路径，让第一批高级属性能稳定 round-trip 到 unit / drop-in。
+4. 最后再考虑 profile、drift 展示和更大范围的高级属性扩展。
 
 ### Phase 3: Container and VM
 
