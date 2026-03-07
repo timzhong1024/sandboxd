@@ -1,4 +1,4 @@
-import { mapSystemdUnitRecord, type ManagedEntity } from "@sandboxd/core";
+import { mapSystemdUnitRecord, type ManagedEntitySummary } from "@sandboxd/core";
 import type {
   ManagedEntityFixtureName,
   ManagedEntityMetadataSourcePort,
@@ -20,9 +20,9 @@ export function createListManagedEntities({
 }: CreateListManagedEntitiesOptions) {
   return async function listManagedEntities(
     options: ListManagedEntitiesOptions = {},
-  ): Promise<ManagedEntity[]> {
+  ): Promise<ManagedEntitySummary[]> {
     if (options.fixtureName) {
-      return metadataSource.listFallbackEntities({ fixtureName: options.fixtureName });
+      return metadataSource.listFallbackEntitySummaries({ fixtureName: options.fixtureName });
     }
 
     try {
@@ -34,6 +34,6 @@ export function createListManagedEntities({
       // Fall through to metadata source.
     }
 
-    return metadataSource.listFallbackEntities();
+    return metadataSource.listFallbackEntitySummaries();
   };
 }

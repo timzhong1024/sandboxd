@@ -13,7 +13,14 @@ test("renders managed entities and badges", () => {
           unitName: "lab-api.service",
           unitType: "service",
           state: "active",
+          slice: "sandboxd.slice",
           labels: {},
+          capabilities: {
+            canInspect: true,
+            canStart: false,
+            canStop: true,
+            canRestart: true,
+          },
         },
       ]}
     />,
@@ -24,4 +31,5 @@ test("renders managed entities and badges", () => {
   expect(screen.getByText("sandboxd")).toBeInTheDocument();
   expect(screen.getByText("Managed entity inventory")).toBeInTheDocument();
   expect(screen.getByText("Total entities")).toBeInTheDocument();
+  expect(screen.getByText("sandboxd.slice")).toBeInTheDocument();
 });

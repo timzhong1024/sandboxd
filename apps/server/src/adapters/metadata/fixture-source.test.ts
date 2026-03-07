@@ -4,7 +4,7 @@ import { createFixtureMetadataSource, parseFixtureName } from "./fixture-source"
 test("returns the mixed fallback fixture by default", async () => {
   const source = createFixtureMetadataSource();
 
-  await expect(source.listFallbackEntities()).resolves.toMatchObject([
+  await expect(source.listFallbackEntitySummaries()).resolves.toMatchObject([
     { unitName: "docker.service" },
     { unitName: "lab-api.service" },
   ]);
@@ -14,8 +14,23 @@ test("returns a named fixture scenario", async () => {
   const source = createFixtureMetadataSource();
 
   await expect(
-    source.listFallbackEntities({ fixtureName: "external-only" }),
+    source.listFallbackEntitySummaries({ fixtureName: "external-only" }),
   ).resolves.toMatchObject([{ unitName: "sshd.service", origin: "external" }]);
+});
+
+test("creates a fallback sandbox service", async () => {
+  const source = createFixtureMetadataSource({ defaultFixtureName: "empty" });
+
+  await expect(
+    source.createFallbackSandboxService({
+      name: "lab-worker",
+      execStart: "/usr/bin/python worker.py",
+    }),
+  ).resolves.toMatchObject({
+    unitName: "lab-worker.service",
+    origin: "sandboxd",
+    state: "inactive",
+  });
 });
 
 test("parses a valid fixture name from the environment", () => {

@@ -5,7 +5,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-test("loads and parses managed entities from the API", async () => {
+test("loads and parses managed entity summaries from the API", async () => {
   vi.stubGlobal(
     "fetch",
     vi.fn().mockResolvedValue({
@@ -18,6 +18,12 @@ test("loads and parses managed entities from the API", async () => {
           unitType: "service",
           state: "active",
           labels: {},
+          capabilities: {
+            canInspect: true,
+            canStart: false,
+            canStop: false,
+            canRestart: false,
+          },
         },
       ],
     }),
@@ -28,6 +34,43 @@ test("loads and parses managed entities from the API", async () => {
   await expect(client.loadManagedEntities()).resolves.toMatchObject([
     { unitName: "docker.service" },
   ]);
+});
+
+test("loads and parses a managed entity detail from the API", async () => {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        kind: "sandbox-service",
+        origin: "sandboxd",
+        unitName: "lab-api.service",
+        unitType: "service",
+        state: "active",
+        labels: {},
+        capabilities: {
+          canInspect: true,
+          canStart: false,
+          canStop: true,
+          canRestart: true,
+        },
+        resourceControls: {},
+        sandboxing: {},
+        status: {
+          activeState: "active",
+          subState: "running",
+          loadState: "loaded",
+        },
+      }),
+    }),
+  );
+
+  const client = createManagedEntitiesHttpClient();
+
+  await expect(client.loadManagedEntity("lab-api.service")).resolves.toMatchObject({
+    unitName: "lab-api.service",
+    status: { subState: "running" },
+  });
 });
 
 test("surfaces API failures", async () => {
