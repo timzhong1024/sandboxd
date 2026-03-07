@@ -1,6 +1,6 @@
 import { once } from "node:events";
+import { ManagedEntityConflictError } from "@sandboxd/control-plane";
 import { afterEach, expect, test, vi } from "vitest";
-import { ManagedEntityConflictError } from "../../use-cases/managed-entity-errors";
 import { createApp } from "./create-app";
 
 const servers = new Set<ReturnType<typeof createApp>>();
@@ -34,6 +34,7 @@ function createEntityDetail(unitName = "lab-api.service") {
 
 function createServerForTest() {
   return createApp({
+    handleMcpRequest: vi.fn().mockResolvedValue(false),
     listManagedEntities: vi.fn().mockResolvedValue([createEntityDetail()]),
     inspectManagedEntity: vi.fn().mockResolvedValue(createEntityDetail()),
     startManagedEntity: vi.fn().mockResolvedValue(createEntityDetail()),
@@ -144,6 +145,7 @@ test("returns healthz status", async () => {
 
 test("returns a conflict status for unsupported actions", async () => {
   const server = createApp({
+    handleMcpRequest: vi.fn().mockResolvedValue(false),
     listManagedEntities: vi.fn().mockResolvedValue([createEntityDetail()]),
     inspectManagedEntity: vi.fn().mockResolvedValue(createEntityDetail()),
     startManagedEntity: vi
@@ -173,4 +175,40 @@ test("returns a conflict status for unsupported actions", async () => {
   await expect(response.json()).resolves.toMatchObject({
     error: expect.stringContaining("cannot be started"),
   });
+});
+
+test("delegates /mcp requests to the MCP handler", async () => {
+  const handleMcpRequest = vi.fn().mockImplementation(async (_request, response) => {
+    response.statusCode = 405;
+    response.end();
+    return true;
+  });
+  const server = createApp({
+    handleMcpRequest,
+    listManagedEntities: vi.fn().mockResolvedValue([createEntityDetail()]),
+    inspectManagedEntity: vi.fn().mockResolvedValue(createEntityDetail()),
+    startManagedEntity: vi.fn().mockResolvedValue(createEntityDetail()),
+    stopManagedEntity: vi.fn().mockResolvedValue(createEntityDetail()),
+    restartManagedEntity: vi.fn().mockResolvedValue(createEntityDetail()),
+    createSandboxService: vi.fn().mockResolvedValue(createEntityDetail("lab-worker.service")),
+  });
+  servers.add(server);
+  server.listen(0, "127.0.0.1");
+  await once(server, "listening");
+
+  const address = server.address();
+  if (!address || typeof address === "string") {
+    throw new TypeError("Expected an ephemeral TCP port");
+  }
+
+  const response = await fetch(`http://127.0.0.1:${address.port}/mcp`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "initialize", params: {} }),
+  });
+
+  expect(handleMcpRequest).toHaveBeenCalledTimes(1);
+  expect(response.status).toBe(405);
 });

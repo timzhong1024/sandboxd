@@ -4,12 +4,11 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   resolve: {
     alias: {
-      "@sandboxd/core": resolve(import.meta.dirname, "../../packages/core/src/index.ts"),
       "@sandboxd/control-plane": resolve(
         import.meta.dirname,
         "../../packages/control-plane/src/index.ts",
       ),
-      "@sandboxd/mcp": resolve(import.meta.dirname, "../mcp/src/index.ts"),
+      "@sandboxd/core": resolve(import.meta.dirname, "../../packages/core/src/index.ts"),
     },
   },
   build: {
@@ -19,7 +18,8 @@ export default defineConfig({
     target: "node24",
     rollupOptions: {
       output: {
-        entryFileNames: "server.js",
+        entryFileNames: "cli.js",
+        banner: "#!/usr/bin/env node",
       },
     },
   },

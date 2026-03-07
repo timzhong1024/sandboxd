@@ -1,11 +1,20 @@
 {
-  "name": "@sandboxd/server",
+  "name": "@sandboxd/mcp",
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
   "scripts": {
-    "build": "vite build",
-    "dev": "vite-node src/index.ts",
+    "build": "vite build && tsc -p tsconfig.build.json",
+    "dev": "vite build --watch",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc -p tsconfig.json"
@@ -14,7 +23,6 @@
     "@modelcontextprotocol/sdk": "^1.27.1",
     "@sandboxd/control-plane": "workspace:*",
     "@sandboxd/core": "workspace:*",
-    "@sandboxd/mcp": "workspace:*",
     "zod": "^4.3.6"
   }
 }
