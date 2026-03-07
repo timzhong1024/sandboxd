@@ -260,12 +260,17 @@ pnpm dev:web
 质量命令：
 
 ```bash
+pnpm exec playwright install chromium
+pnpm verify
+pnpm test:e2e
 pnpm build
 pnpm typecheck
 pnpm lint
 pnpm format:check
 pnpm test
 ```
+
+其中 `pnpm verify` 是统一验收入口，会顺序执行 `format:check`、`lint`、`typecheck`、`test`、`test:e2e`、`build`。`test:e2e` 通过 Playwright 同时拉起 server 和 web，验证 UI 到 API 的最小联通回路。首次在本机运行前需要先安装一次 Chromium。
 
 ## 参考资料
 

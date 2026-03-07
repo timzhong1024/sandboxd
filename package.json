@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "build": "pnpm -r build",
+    "ci": "pnpm verify",
     "dev:server": "pnpm --filter @sandboxd/server dev",
     "dev:web": "pnpm --filter @sandboxd/web dev",
     "format": "oxfmt --write .",
@@ -12,10 +13,13 @@
     "lint": "oxlint .",
     "lint:fix": "oxlint . --fix",
     "test": "pnpm -r test",
+    "test:e2e": "playwright test",
     "test:watch": "pnpm -r test:watch",
-    "typecheck": "pnpm -r typecheck"
+    "typecheck": "pnpm -r typecheck",
+    "verify": "node ./scripts/verify.mjs"
   },
   "devDependencies": {
+    "@playwright/test": "^1.58.2",
     "@types/node": "^24.0.0",
     "@vitest/coverage-v8": "^4.0.0",
     "oxfmt": "^0.36.0",

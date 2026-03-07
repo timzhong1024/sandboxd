@@ -26,7 +26,7 @@ afterEach(async () => {
 test("returns entities through the API", async () => {
   const server = buildApp();
   servers.add(server);
-  server.listen(0);
+  server.listen(0, "127.0.0.1");
   await once(server, "listening");
 
   const address = server.address();
