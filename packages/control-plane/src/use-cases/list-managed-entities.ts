@@ -42,11 +42,20 @@ export function createListManagedEntities({
       if (records.length === 0 && managedMetadata.length === 0) {
         return metadataSource.listFallbackEntitySummaries();
       }
-      const summaries = records.map((record) =>
-        mergeSummaryWithMetadata(
-          mapSystemdUnitRecord(record),
-          metadataByUnitName.get(record.unitName) ?? null,
-        ),
+      const summaries = await Promise.all(
+        records.map(async (record) => {
+          const metadata = metadataByUnitName.get(record.unitName) ?? null;
+          if (!metadata) {
+            return mapSystemdUnitRecord(record);
+          }
+
+          const detailRecord = await systemdRuntime.getUnit(record.unitName);
+          if (detailRecord) {
+            return mergeSummaryWithMetadata(mapSystemdUnitDetailRecord(detailRecord), metadata);
+          }
+
+          return mergeSummaryWithMetadata(mapSystemdUnitRecord(record), metadata);
+        }),
       );
       const knownUnitNames = new Set(summaries.map((summary) => summary.unitName));
 

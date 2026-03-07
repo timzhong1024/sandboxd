@@ -2,9 +2,11 @@ import type { IncomingMessage, ServerResponse } from "node:http";
 import { createServer } from "node:http";
 import {
   parseCreateSandboxServiceInput,
+  parseDangerousAdoptManagedEntityInput,
   parseManagedEntityDetail,
   parseManagedEntitySummaries,
   type CreateSandboxServiceInput,
+  type DangerousAdoptManagedEntityInput,
   type ManagedEntityDetail,
   type ManagedEntitySummary,
 } from "@sandboxd/core";
@@ -25,6 +27,10 @@ interface CreateAppOptions {
   startManagedEntity: (unitName: string) => Promise<ManagedEntityDetail>;
   stopManagedEntity: (unitName: string) => Promise<ManagedEntityDetail>;
   restartManagedEntity: (unitName: string) => Promise<ManagedEntityDetail>;
+  dangerouslyAdoptManagedEntity: (
+    unitName: string,
+    input: DangerousAdoptManagedEntityInput,
+  ) => Promise<ManagedEntityDetail>;
   createSandboxService: (input: CreateSandboxServiceInput) => Promise<ManagedEntityDetail>;
 }
 
@@ -35,6 +41,7 @@ export function createApp({
   startManagedEntity,
   stopManagedEntity,
   restartManagedEntity,
+  dangerouslyAdoptManagedEntity,
   createSandboxService,
 }: CreateAppOptions) {
   return createServer(async (request, response) => {
@@ -81,6 +88,27 @@ export function createApp({
         const action = matchedAction as keyof typeof handlers;
 
         sendJson(response, 200, parseManagedEntityDetail(await handlers[action](unitName)));
+        return;
+      }
+
+      const dangerousAdoptMatch = /^\/api\/entities\/(?<unitName>[^/]+)\/dangerous-adopt$/.exec(
+        url.pathname,
+      );
+      if (request.method === "POST" && dangerousAdoptMatch?.groups) {
+        const encodedUnitName = dangerousAdoptMatch.groups.unitName;
+        if (!encodedUnitName) {
+          sendJson(response, 400, { error: "Invalid dangerous adopt path" });
+          return;
+        }
+
+        const unitName = decodeURIComponent(encodedUnitName);
+        const body = await readJsonBody(request);
+        const input = parseDangerousAdoptManagedEntityInput(body);
+        sendJson(
+          response,
+          200,
+          parseManagedEntityDetail(await dangerouslyAdoptManagedEntity(unitName, input)),
+        );
         return;
       }
 

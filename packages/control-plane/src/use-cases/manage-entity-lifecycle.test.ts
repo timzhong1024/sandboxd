@@ -36,6 +36,8 @@ function createEntityDetail(unitName = "lab-api.service", state = "active") {
 function createMetadataSource(): ManagedEntityMetadataSourcePort {
   return {
     deleteManagedEntityMetadata: vi.fn(),
+    dangerouslyAdoptFallbackEntity: vi.fn().mockResolvedValue(null),
+    dangerouslyAdoptManagedEntity: vi.fn(),
     listFallbackEntitySummaries: vi.fn().mockResolvedValue([]),
     listManagedEntityMetadata: vi.fn().mockResolvedValue([]),
     getManagedEntityMetadata: vi.fn().mockResolvedValue({
@@ -67,6 +69,7 @@ function createRuntime(overrides: Partial<SystemdRuntimePort>): SystemdRuntimePo
       subState: "running",
       description: "Sandboxd managed lab API",
     }),
+    reloadSystemd: vi.fn().mockResolvedValue(undefined),
     startUnit: vi.fn().mockResolvedValue(undefined),
     stopUnit: vi.fn().mockResolvedValue(undefined),
     restartUnit: vi.fn().mockResolvedValue(undefined),

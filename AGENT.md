@@ -35,6 +35,7 @@ Sandboxd 是一个 systemd-first 的 homelab sandbox manager。
 
 - `packages/core` 导出 `ManagedEntitySummary`、`ManagedEntityDetail`、`CreateSandboxServiceInput` 等共享契约
 - `packages/control-plane` 提供真实可复用的 metadata/runtime adapter 与业务编排
+- sandboxd ownership 不再落在 `/var/lib/sandboxd` 之类的独立状态目录，默认贴在 systemd unit / drop-in 的 `X-Sandboxd` 段
 - `apps/server` 提供：
   - `GET /healthz`
   - `GET /api/entities`
@@ -42,6 +43,7 @@ Sandboxd 是一个 systemd-first 的 homelab sandbox manager。
   - `POST /api/entities/:unitName/start`
   - `POST /api/entities/:unitName/stop`
   - `POST /api/entities/:unitName/restart`
+  - `POST /api/entities/:unitName/dangerous-adopt`
   - `POST /api/sandbox-services`
   - `POST /mcp`
 - `apps/web` 已经完成列表、详情、动作、创建的单页工作台
@@ -118,6 +120,7 @@ Sandboxd 是一个 systemd-first 的 homelab sandbox manager。
 - `ManagedEntitySummary`
 - `ManagedEntityDetail`
 - `CreateSandboxServiceInput`
+- `DangerousAdoptManagedEntityInput`
 
 其中：
 

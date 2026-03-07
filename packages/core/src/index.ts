@@ -68,6 +68,10 @@ export const createSandboxServiceInputSchema = z.object({
   sandboxing: sandboxingSchema.optional(),
 });
 
+export const dangerousAdoptManagedEntityInputSchema = z.object({
+  sandboxProfile: z.string().optional(),
+});
+
 export const managedEntitySummariesSchema = z.array(managedEntitySummarySchema);
 
 export const systemdUnitRecordSchema = z.object({
@@ -97,6 +101,9 @@ export type ManagedEntityStatus = z.infer<typeof managedEntityStatusSchema>;
 export type ResourceControls = z.infer<typeof resourceControlsSchema>;
 export type Sandboxing = z.infer<typeof sandboxingSchema>;
 export type CreateSandboxServiceInput = z.infer<typeof createSandboxServiceInputSchema>;
+export type DangerousAdoptManagedEntityInput = z.infer<
+  typeof dangerousAdoptManagedEntityInputSchema
+>;
 export type SystemdUnitRecord = z.infer<typeof systemdUnitRecordSchema>;
 export type SystemdUnitDetailRecord = z.infer<typeof systemdUnitDetailRecordSchema>;
 
@@ -177,4 +184,10 @@ export function parseManagedEntityDetail(input: unknown): ManagedEntityDetail {
 
 export function parseCreateSandboxServiceInput(input: unknown): CreateSandboxServiceInput {
   return createSandboxServiceInputSchema.parse(input);
+}
+
+export function parseDangerousAdoptManagedEntityInput(
+  input: unknown,
+): DangerousAdoptManagedEntityInput {
+  return dangerousAdoptManagedEntityInputSchema.parse(input);
 }

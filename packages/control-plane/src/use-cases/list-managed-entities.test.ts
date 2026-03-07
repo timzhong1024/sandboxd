@@ -24,6 +24,8 @@ const fallbackEntities: ManagedEntitySummary[] = [
 function createMetadataSource(): ManagedEntityMetadataSourcePort {
   return {
     deleteManagedEntityMetadata: vi.fn(),
+    dangerouslyAdoptFallbackEntity: vi.fn().mockResolvedValue(null),
+    dangerouslyAdoptManagedEntity: vi.fn(),
     listFallbackEntitySummaries: vi.fn().mockResolvedValue(fallbackEntities),
     listManagedEntityMetadata: vi.fn().mockResolvedValue([]),
     getManagedEntityMetadata: vi.fn().mockResolvedValue(null),
@@ -39,6 +41,7 @@ function createRuntime(overrides: Partial<SystemdRuntimePort>): SystemdRuntimePo
     createSandboxService: vi.fn().mockResolvedValue(undefined),
     listUnits: vi.fn().mockResolvedValue([]),
     getUnit: vi.fn().mockResolvedValue(null),
+    reloadSystemd: vi.fn().mockResolvedValue(undefined),
     startUnit: vi.fn().mockResolvedValue(undefined),
     stopUnit: vi.fn().mockResolvedValue(undefined),
     restartUnit: vi.fn().mockResolvedValue(undefined),
@@ -71,17 +74,36 @@ test("returns mapped runtime entities when runtime succeeds", async () => {
 
 test("merges sandboxd metadata into runtime summaries and includes metadata-only units", async () => {
   const runtime = createRuntime({
-    getUnit: vi.fn().mockResolvedValue({
-      unitName: "lab-worker.service",
-      loadState: "loaded",
-      activeState: "inactive",
-      subState: "dead",
-      description: "Sandboxd managed lab worker",
-      slice: "sandboxd.slice",
-      resourceControls: {
-        cpuWeight: "200",
-      },
-      sandboxing: {},
+    getUnit: vi.fn().mockImplementation(async (unitName: string) => {
+      if (unitName === "lab-api.service") {
+        return {
+          unitName: "lab-api.service",
+          loadState: "loaded",
+          activeState: "active",
+          subState: "running",
+          description: "Sandboxd managed lab API",
+          slice: "sandboxd.slice",
+          resourceControls: {},
+          sandboxing: {},
+        };
+      }
+
+      if (unitName === "lab-worker.service") {
+        return {
+          unitName: "lab-worker.service",
+          loadState: "loaded",
+          activeState: "inactive",
+          subState: "dead",
+          description: "Sandboxd managed lab worker",
+          slice: "sandboxd.slice",
+          resourceControls: {
+            cpuWeight: "200",
+          },
+          sandboxing: {},
+        };
+      }
+
+      return null;
     }),
     listUnits: vi.fn().mockResolvedValue([
       {

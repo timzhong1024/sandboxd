@@ -1,5 +1,6 @@
 import type {
   CreateSandboxServiceInput,
+  DangerousAdoptManagedEntityInput,
   ManagedEntityDetail,
   ManagedEntitySummary,
 } from "@sandboxd/core";
@@ -20,6 +21,7 @@ interface ParsedCommonFlags {
 type CliControlPlane = Pick<
   ControlPlane,
   | "createSandboxService"
+  | "dangerouslyAdoptManagedEntity"
   | "inspectManagedEntity"
   | "listManagedEntities"
   | "restartManagedEntity"
@@ -83,6 +85,10 @@ export async function runCli(argv: string[], io: CliIo = {}) {
       return await handleCreateCommand(rest, parsed.json, stdout, controlPlane);
     }
 
+    if (command === "dangerous-adopt") {
+      return await handleDangerousAdoptCommand(rest, parsed.json, stdout, controlPlane);
+    }
+
     stderr.write(`Unknown command: ${command}\n`);
     stderr.write(`${usageText}\n`);
     return 2;
@@ -136,6 +142,23 @@ async function handleCreateCommand(
   return 0;
 }
 
+async function handleDangerousAdoptCommand(
+  args: string[],
+  json: boolean,
+  stdout: { write(chunk: string): void },
+  controlPlane: CliControlPlane,
+) {
+  const unitName = requirePositional(args[0], "dangerous-adopt requires <unitName>");
+  const options = parseDangerousAdoptFlags(args.slice(1));
+  const input: DangerousAdoptManagedEntityInput = {
+    sandboxProfile: asOptionalString(options.profile),
+  };
+
+  const adopted = await controlPlane.dangerouslyAdoptManagedEntity(unitName, input);
+  writeOutput(stdout, json, adopted, formatActionResult("dangerous-adopt", adopted));
+  return 0;
+}
+
 function parseCommonFlags(argv: string[]): ParsedCommonFlags {
   const remainingArgs: string[] = [];
   let json = false;
@@ -181,6 +204,31 @@ function parseCreateFlags(args: string[]): CreateDraft {
     }
 
     result[key] = value;
+    index += 1;
+  }
+
+  return result;
+}
+
+function parseDangerousAdoptFlags(args: string[]) {
+  const result: Record<string, string> = {};
+
+  for (let index = 0; index < args.length; index += 1) {
+    const argument = args[index];
+    if (!argument?.startsWith("--")) {
+      throw new CliArgumentError(`Unexpected argument: ${argument}`);
+    }
+
+    if (argument !== "--profile") {
+      throw new CliArgumentError(`Unknown dangerous-adopt flag: ${argument}`);
+    }
+
+    const value = args[index + 1];
+    if (!value || value.startsWith("--")) {
+      throw new CliArgumentError(`${argument} requires a value`);
+    }
+
+    result.profile = value;
     index += 1;
   }
 
@@ -302,4 +350,5 @@ const usageText = `Usage:
   sandboxctl start <unitName> [--json]
   sandboxctl stop <unitName> [--json]
   sandboxctl restart <unitName> [--json]
+  sandboxctl dangerous-adopt <unitName> [--profile <profile>] [--json]
   sandboxctl create sandboxed-service <name> --exec-start <cmd> [flags...] [--json]`;

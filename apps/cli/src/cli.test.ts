@@ -5,6 +5,7 @@ import { runCli } from "./cli";
 function createControlPlaneMock(): ControlPlane {
   return {
     createSandboxService: vi.fn(),
+    dangerouslyAdoptManagedEntity: vi.fn(),
     inspectManagedEntity: vi.fn(),
     listManagedEntities: vi.fn(),
     restartManagedEntity: vi.fn(),
@@ -163,6 +164,44 @@ describe("runCli", () => {
     expect(stderr.write).toHaveBeenCalledWith(
       expect.stringContaining("Managed entity cannot be started"),
     );
+  });
+
+  test("parses dangerous-adopt flags into the control-plane payload", async () => {
+    const stdout = { write: vi.fn() };
+    const controlPlane = createControlPlaneMock();
+    vi.mocked(controlPlane.dangerouslyAdoptManagedEntity).mockResolvedValue({
+      unitName: "docker.service",
+      kind: "sandbox-service",
+      origin: "sandboxd",
+      unitType: "service",
+      state: "active",
+      subState: "running",
+      loadState: "loaded",
+      labels: {},
+      capabilities: {
+        canInspect: true,
+        canStart: false,
+        canStop: true,
+        canRestart: true,
+      },
+      resourceControls: {},
+      sandboxing: {},
+      status: {
+        activeState: "active",
+        subState: "running",
+        loadState: "loaded",
+      },
+    });
+
+    const exitCode = await runCli(["dangerous-adopt", "docker.service", "--profile", "baseline"], {
+      createControlPlane: () => controlPlane,
+      stdout,
+    });
+
+    expect(exitCode).toBe(0);
+    expect(controlPlane.dangerouslyAdoptManagedEntity).toHaveBeenCalledWith("docker.service", {
+      sandboxProfile: "baseline",
+    });
   });
 
   test("returns exit code 2 for missing required create flags", async () => {

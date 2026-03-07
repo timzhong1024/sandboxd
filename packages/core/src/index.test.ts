@@ -6,6 +6,7 @@ import {
   mapSystemdUnitDetailRecord,
   mapSystemdUnitRecord,
   parseCreateSandboxServiceInput,
+  parseDangerousAdoptManagedEntityInput,
   parseManagedEntityDetail,
   parseManagedEntitySummaries,
   type ManagedEntitySummary,
@@ -99,6 +100,14 @@ test("parses a valid create sandbox service input payload", () => {
   });
 
   expect(input.name).toBe("lab-api");
+});
+
+test("parses a valid dangerous adopt input payload", () => {
+  const input = parseDangerousAdoptManagedEntityInput({
+    sandboxProfile: "strict",
+  });
+
+  expect(input.sandboxProfile).toBe("strict");
 });
 
 test("rejects an invalid managed entity summary payload", () => {

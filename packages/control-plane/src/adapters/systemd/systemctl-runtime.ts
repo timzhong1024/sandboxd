@@ -47,6 +47,10 @@ export function createSystemctlRuntime(): SystemdRuntimePort {
       ensureSystemctlAvailable();
       await runSystemctl(["restart", unitName]);
     },
+    async reloadSystemd() {
+      ensureSystemctlAvailable();
+      await runSystemctl(["daemon-reload"]);
+    },
   };
 }
 

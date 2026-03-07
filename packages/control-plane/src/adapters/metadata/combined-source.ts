@@ -1,5 +1,6 @@
 import type {
   CreateSandboxServiceInput,
+  DangerousAdoptManagedEntityInput,
   ManagedEntityDetail,
   ManagedEntitySummary,
 } from "@sandboxd/core";
@@ -13,6 +14,7 @@ interface CreateCombinedMetadataSourceOptions {
   fallbackSource: Pick<
     ManagedEntityMetadataSourcePort,
     | "createFallbackSandboxService"
+    | "dangerouslyAdoptFallbackEntity"
     | "getFallbackEntityDetail"
     | "listFallbackEntitySummaries"
     | "updateFallbackEntityState"
@@ -20,6 +22,7 @@ interface CreateCombinedMetadataSourceOptions {
   managedEntitySource: Pick<
     ManagedEntityMetadataSourcePort,
     | "deleteManagedEntityMetadata"
+    | "dangerouslyAdoptManagedEntity"
     | "getManagedEntityMetadata"
     | "listManagedEntityMetadata"
     | "saveManagedEntityMetadata"
@@ -35,6 +38,15 @@ export function createCombinedMetadataSource({
       input: CreateSandboxServiceInput,
     ): Promise<ManagedEntityDetail> {
       return fallbackSource.createFallbackSandboxService(input);
+    },
+    async dangerouslyAdoptFallbackEntity(
+      unitName: string,
+      input: DangerousAdoptManagedEntityInput,
+    ): Promise<ManagedEntityDetail | null> {
+      return fallbackSource.dangerouslyAdoptFallbackEntity(unitName, input);
+    },
+    async dangerouslyAdoptManagedEntity(unitName: string, input: DangerousAdoptManagedEntityInput) {
+      return managedEntitySource.dangerouslyAdoptManagedEntity(unitName, input);
     },
     async deleteManagedEntityMetadata(unitName: string): Promise<void> {
       return managedEntitySource.deleteManagedEntityMetadata(unitName);

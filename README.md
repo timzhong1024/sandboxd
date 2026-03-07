@@ -160,7 +160,7 @@ flowchart LR
   P --> R["runtime adapter"]
   R --> D["systemd D-Bus / systemctl / busctl"]
   R --> U["unit files / transient units"]
-  P --> F["/var/lib/sandboxd metadata"]
+  P --> F["X-Sandboxd unit/drop-in metadata"]
 ```
 
 ### 组件划分
@@ -191,7 +191,7 @@ flowchart LR
 
 - 持久化对象优先使用真实 unit file。
 - 瞬时对象可使用 transient unit / scope。
-- 项目托管对象的元数据采用 filesystem-first，保存在 `/var/lib/sandboxd/`。
+- 项目托管对象的 ownership 元数据优先贴在 systemd unit / drop-in 中的 `X-Sandboxd` 段。
 - unit 的真实状态、依赖关系、启动顺序和故障语义一律以 systemd 为源。
 
 V1 不承诺数据库，也不承诺自定义 agent runtime。所有复杂度都优先压进 systemd 原语和少量附加元数据。
@@ -298,6 +298,7 @@ sandboxctl inspect nginx.service
 sandboxctl start my-lab.service
 sandboxctl stop my-lab.service
 sandboxctl restart my-lab.service
+sandboxctl dangerous-adopt docker.service --profile baseline
 sandboxctl create sandboxed-service my-lab --cpu-weight 200 --memory-max 512M --profile strict
 ```
 
@@ -308,6 +309,7 @@ CLI 的目标不是包一层与 systemctl 冲突的方言，而是暴露 Sandbox
 - 本机直接依赖 shared control-plane，不需要先启动 `server`
 - 所有命令支持 `--json`
 - 创建、读写动作都直接走本地 runtime / metadata adapter
+- 额外提供 `dangerous-adopt`，可把已有 systemd service 标记为 sandboxd owned
 
 ### MCP
 
@@ -325,6 +327,7 @@ MCP 的职责是让 agent 在“受管对象”这个抽象层上工作，而不
 - server 通过 `POST /mcp` 暴露无状态 MCP HTTP endpoint
 - MCP tool 定义在独立的 `apps/mcp` workspace
 - MCP 直接复用 shared control-plane，不走本地 HTTP 回环
+- 额外暴露危险工具，把已有 systemd service 标记为 sandboxd owned
 
 未来如果扩展 container / VM，MCP 也复用同一 `ManagedEntity` 模型，而不是新增一套旁路工具。
 
@@ -338,6 +341,7 @@ GET  /api/entities/:unitName
 POST /api/entities/:unitName/start
 POST /api/entities/:unitName/stop
 POST /api/entities/:unitName/restart
+POST /api/entities/:unitName/dangerous-adopt
 POST /api/sandbox-services
 POST /mcp
 ```
@@ -347,6 +351,7 @@ POST /mcp
 - `GET /api/entities` 返回 `ManagedEntitySummary[]`
 - `GET /api/entities/:unitName` 返回 `ManagedEntityDetail`
 - 三个动作接口返回动作后的 `ManagedEntityDetail`
+- `POST /api/entities/:unitName/dangerous-adopt` 接收危险认领入参并返回动作后的 `ManagedEntityDetail`
 - `POST /api/sandbox-services` 接收 `CreateSandboxServiceInput` 并返回新建对象的 `ManagedEntityDetail`
 
 ### 典型场景

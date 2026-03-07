@@ -31,16 +31,27 @@ test("persists and loads managed entity metadata", async () => {
   await expect(source.getManagedEntityMetadata("lab-api.service")).resolves.toMatchObject({
     unitName: "lab-api.service",
     sandboxProfile: "strict",
-    resourceControls: {
-      cpuWeight: "200",
-    },
-    sandboxing: {
-      noNewPrivileges: true,
-    },
+    resourceControls: {},
+    sandboxing: {},
   });
   await expect(source.listManagedEntityMetadata()).resolves.toMatchObject([
     {
       unitName: "lab-api.service",
     },
   ]);
+});
+
+test("dangerously adopts an existing unit through a sandboxd drop-in", async () => {
+  const rootDir = await mkdtemp(join(tmpdir(), "sandboxd-metadata-"));
+  tempDirs.push(rootDir);
+  const source = createFilesystemMetadataSource({ rootDir });
+
+  await source.dangerouslyAdoptManagedEntity("docker.service", {
+    sandboxProfile: "baseline",
+  });
+
+  await expect(source.getManagedEntityMetadata("docker.service")).resolves.toMatchObject({
+    unitName: "docker.service",
+    sandboxProfile: "baseline",
+  });
 });
