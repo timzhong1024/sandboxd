@@ -137,12 +137,12 @@ export interface CreateSandboxServiceInput {
 
 分类规则：
 
-| 类别              | systemd 背书                       | V1 状态 | WebUI 表现                                            |
-| ----------------- | ---------------------------------- | ------- | ----------------------------------------------------- |
-| `systemd-unit`    | 宿主机已有 unit                    | 已实现  | 普通 unit，显示 `external` 或 `sandboxd-managed` 标签 |
-| `sandbox-service` | `service` + 专用 `slice`           | 已实现  | 特殊高亮，显示资源与沙箱信息                          |
-| `container`       | 未来映射到 unit-backed container   | 预留    | 特殊图标和分类                                        |
-| `vm`              | 未来映射到 wrapped QEMU unit       | 预留    | 特殊图标和分类                                        |
+| 类别              | systemd 背书                     | V1 状态 | WebUI 表现                                            |
+| ----------------- | -------------------------------- | ------- | ----------------------------------------------------- |
+| `systemd-unit`    | 宿主机已有 unit                  | 已实现  | 普通 unit，显示 `external` 或 `sandboxd-managed` 标签 |
+| `sandbox-service` | `service` + 专用 `slice`         | 已实现  | 特殊高亮，显示资源与沙箱信息                          |
+| `container`       | 未来映射到 unit-backed container | 预留    | 特殊图标和分类                                        |
+| `vm`              | 未来映射到 wrapped QEMU unit     | 预留    | 特殊图标和分类                                        |
 
 项目托管对象的生命周期仍以 systemd 为准。Sandboxd 负责的是发现、命名、元数据、展示和操作入口，而不是自己维护一套平行状态机。
 
