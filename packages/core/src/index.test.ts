@@ -1,10 +1,8 @@
 import { expect, test } from "vitest";
 import {
   getUnitType,
-  getManagedEntityFixture,
   isSandboxdManaged,
   mapSystemdUnitRecord,
-  managedEntityFixtureNames,
   parseManagedEntities,
   type ManagedEntity,
 } from "./index";
@@ -23,7 +21,24 @@ test("identifies sandboxd-managed entities", () => {
 });
 
 test("parses a valid managed entity payload", () => {
-  const entities = parseManagedEntities(getManagedEntityFixture("mixed"));
+  const entities = parseManagedEntities([
+    {
+      kind: "systemd-unit",
+      origin: "external",
+      unitName: "docker.service",
+      unitType: "service",
+      state: "active",
+      labels: {},
+    },
+    {
+      kind: "sandbox-service",
+      origin: "sandboxd",
+      unitName: "lab-api.service",
+      unitType: "service",
+      state: "active",
+      labels: {},
+    },
+  ]);
 
   expect(entities).toHaveLength(2);
   expect(entities[1]).toMatchObject({ unitName: "lab-api.service" });
@@ -33,11 +48,6 @@ test("rejects an invalid managed entity payload", () => {
   expect(() => parseManagedEntities([{ unitName: "broken.service", labels: {} }])).toThrow(
     /field "kind" must be a string/i,
   );
-});
-
-test("provides stable fixture scenarios for integration tests", () => {
-  expect(managedEntityFixtureNames).toEqual(["mixed", "external-only", "empty"]);
-  expect(getManagedEntityFixture("external-only")).toMatchObject([{ unitName: "sshd.service" }]);
 });
 
 test("maps a systemd unit record into the shared entity model", () => {

@@ -21,53 +21,6 @@ export interface SystemdUnitRecord {
   description: string;
 }
 
-export const managedEntityFixtureNames = ["mixed", "external-only", "empty"] as const;
-
-export type ManagedEntityFixtureName = (typeof managedEntityFixtureNames)[number];
-
-export const managedEntityFixtures: Record<ManagedEntityFixtureName, ManagedEntity[]> = {
-  mixed: [
-    {
-      kind: "systemd-unit",
-      origin: "external",
-      unitName: "docker.service",
-      unitType: "service",
-      state: "active",
-      slice: "system.slice",
-      labels: {
-        source: "host",
-      },
-    },
-    {
-      kind: "sandbox-service",
-      origin: "sandboxd",
-      unitName: "lab-api.service",
-      unitType: "service",
-      state: "active",
-      slice: "sandboxd.slice",
-      labels: {
-        profile: "strict",
-        source: "sandboxd",
-      },
-      sandboxProfile: "strict",
-    },
-  ],
-  "external-only": [
-    {
-      kind: "systemd-unit",
-      origin: "external",
-      unitName: "sshd.service",
-      unitType: "service",
-      state: "active",
-      slice: "system.slice",
-      labels: {
-        source: "host",
-      },
-    },
-  ],
-  empty: [],
-};
-
 export function isSandboxdManaged(entity: ManagedEntity) {
   return entity.origin === "sandboxd";
 }
@@ -79,13 +32,6 @@ export function getUnitType(unitName: string) {
   }
 
   return unitName.slice(separatorIndex + 1);
-}
-
-export function getManagedEntityFixture(name: ManagedEntityFixtureName): ManagedEntity[] {
-  return managedEntityFixtures[name].map((entity) => ({
-    ...entity,
-    labels: { ...entity.labels },
-  }));
 }
 
 export function mapSystemdUnitRecord(record: SystemdUnitRecord): ManagedEntity {

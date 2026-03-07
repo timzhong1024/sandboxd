@@ -1,47 +1,20 @@
-import {
-  getManagedEntityFixture,
-  mapSystemdUnitRecord,
-  managedEntityFixtureNames,
-  type SystemdUnitRecord,
-  type ManagedEntity,
-  type ManagedEntityFixtureName,
-} from "@sandboxd/core";
 import { spawn } from "node:child_process";
+import type { SystemdUnitRecord } from "@sandboxd/core";
+import type { SystemdRuntimePort } from "../../ports/systemd-runtime-port";
 
-const defaultFixtureName = parseFixtureName(process.env.SANDBOXD_ENTITY_FIXTURE) ?? "mixed";
 const listUnitsArgs = ["list-units", "--all", "--plain", "--no-legend", "--no-pager"];
 
-export async function listEntities(
-  fixtureName: ManagedEntityFixtureName = defaultFixtureName,
-): Promise<ManagedEntity[]> {
-  if (process.env.SANDBOXD_ENTITY_FIXTURE || process.platform !== "linux") {
-    return getManagedEntityFixture(fixtureName);
-  }
+export function createSystemctlRuntime(): SystemdRuntimePort {
+  return {
+    async listUnits() {
+      if (process.platform !== "linux") {
+        throw new Error("systemctl runtime is only available on Linux");
+      }
 
-  try {
-    const stdout = await runSystemctl(listUnitsArgs);
-    const records = parseSystemctlListUnitsOutput(stdout);
-
-    if (records.length === 0) {
-      return getManagedEntityFixture(fixtureName);
-    }
-
-    return records.map(mapSystemdUnitRecord);
-  } catch {
-    return getManagedEntityFixture(fixtureName);
-  }
-}
-
-function parseFixtureName(value: string | undefined): ManagedEntityFixtureName | undefined {
-  if (!value) {
-    return undefined;
-  }
-
-  if (managedEntityFixtureNames.includes(value as ManagedEntityFixtureName)) {
-    return value as ManagedEntityFixtureName;
-  }
-
-  throw new TypeError(`Unknown entity fixture: ${value}`);
+      const stdout = await runSystemctl(listUnitsArgs);
+      return parseSystemctlListUnitsOutput(stdout);
+    },
+  };
 }
 
 export function parseSystemctlListUnitsOutput(stdout: string): SystemdUnitRecord[] {

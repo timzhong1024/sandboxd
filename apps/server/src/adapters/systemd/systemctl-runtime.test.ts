@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { parseSystemctlListUnitsOutput } from "./entities";
+import { parseSystemctlListUnitsOutput } from "./systemctl-runtime";
 
 test("parses the standard systemctl list-units text format", () => {
   const output = [

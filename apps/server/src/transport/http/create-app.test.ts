@@ -1,8 +1,8 @@
 import { once } from "node:events";
-import { afterEach, expect, test } from "vitest";
-import { buildApp } from "./app";
+import { afterEach, expect, test, vi } from "vitest";
+import { createApp } from "./create-app";
 
-const servers = new Set<ReturnType<typeof buildApp>>();
+const servers = new Set<ReturnType<typeof createApp>>();
 
 afterEach(async () => {
   await Promise.all(
@@ -24,7 +24,25 @@ afterEach(async () => {
 });
 
 test("returns entities through the API", async () => {
-  const server = buildApp({ fixtureName: "mixed" });
+  const listManagedEntities = vi.fn().mockResolvedValue([
+    {
+      unitName: "docker.service",
+      kind: "systemd-unit",
+      origin: "external",
+      unitType: "service",
+      state: "active",
+      labels: {},
+    },
+    {
+      unitName: "lab-api.service",
+      kind: "sandbox-service",
+      origin: "sandboxd",
+      unitType: "service",
+      state: "active",
+      labels: {},
+    },
+  ]);
+  const server = createApp({ listManagedEntities });
   servers.add(server);
   server.listen(0, "127.0.0.1");
   await once(server, "listening");
@@ -43,8 +61,8 @@ test("returns entities through the API", async () => {
   ]);
 });
 
-test("can serve alternative fixture scenarios", async () => {
-  const server = buildApp({ fixtureName: "external-only" });
+test("returns healthz status", async () => {
+  const server = createApp({ listManagedEntities: vi.fn().mockResolvedValue([]) });
   servers.add(server);
   server.listen(0, "127.0.0.1");
   await once(server, "listening");
@@ -54,8 +72,8 @@ test("can serve alternative fixture scenarios", async () => {
     throw new TypeError("Expected an ephemeral TCP port");
   }
 
-  const response = await fetch(`http://127.0.0.1:${address.port}/api/entities`);
+  const response = await fetch(`http://127.0.0.1:${address.port}/healthz`);
 
   expect(response.ok).toBe(true);
-  expect(await response.json()).toMatchObject([{ unitName: "sshd.service", origin: "external" }]);
+  await expect(response.json()).resolves.toEqual({ status: "ok" });
 });

@@ -2,27 +2,25 @@ import { render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, expect, test, vi } from "vitest";
 import { App } from "./App";
 
-const sampleResponse = [
-  {
-    kind: "sandbox-service",
-    origin: "sandboxd",
-    unitName: "lab-api.service",
-    unitType: "service",
-    state: "active",
-    slice: "sandboxd.slice",
-    labels: {
-      stack: "lab",
-    },
-    sandboxProfile: "strict",
-  },
-];
-
 beforeEach(() => {
   vi.stubGlobal(
     "fetch",
     vi.fn().mockResolvedValue({
       ok: true,
-      json: async () => sampleResponse,
+      json: async () => [
+        {
+          kind: "sandbox-service",
+          origin: "sandboxd",
+          unitName: "lab-api.service",
+          unitType: "service",
+          state: "active",
+          slice: "sandboxd.slice",
+          labels: {
+            stack: "lab",
+          },
+          sandboxProfile: "strict",
+        },
+      ],
     }),
   );
 });

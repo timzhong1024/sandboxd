@@ -147,6 +147,31 @@ flowchart LR
 
 V1 不承诺数据库，也不承诺自定义 agent runtime。所有复杂度都优先压进 systemd 原语和少量附加元数据。
 
+### 当前代码分层
+
+为了降低技术债并提高 AI 并行开发效率，当前代码默认按以下方向拆分：
+
+- `packages/core`：领域模型、纯映射、纯解析、纯校验
+- `apps/server/src/ports`：server use-case 依赖的接口
+- `apps/server/src/adapters/systemd`：systemd runtime 访问
+- `apps/server/src/adapters/metadata`：fixture / fallback / 未来 metadata source
+- `apps/server/src/use-cases`：服务端业务编排
+- `apps/server/src/transport/http`：HTTP transport
+- `apps/web/src/ports`：前端 use-case 依赖的 client 接口
+- `apps/web/src/transport/http`：API 请求与 payload 解析
+- `apps/web/src/use-cases`：前端业务动作编排
+- `apps/web/src/view-model`：React 状态组织
+- `apps/web/src/ui`：纯渲染组件
+
+默认依赖方向是：
+
+- `core` 不依赖 `server` / `web`
+- `use-cases` 依赖 `ports` + `core`
+- `adapters` 实现 `ports`
+- `transport` 依赖 `use-cases`，不直接拼业务逻辑
+
+这套约束的目的不是追求“层数更多”，而是把 agent 高频改动拆散，避免多个任务总是集中编辑同一个文件。
+
 ## 控制面
 
 三种入口共享同一套动作语义与同一实体模型。
@@ -290,7 +315,7 @@ pnpm test
 - `pnpm smoke:dev` 会直接拉起 server 和 web，检查 `/healthz`、`/api/entities` 和首页标题
 - `pnpm verify` 是提交前的全量回路，会顺序执行 `format:check`、`lint`、`typecheck`、`test`、`test:e2e`、`build`
 
-另外，`ManagedEntity` 的 fixture 场景和运行时 payload 校验已经收敛到 `@sandboxd/core`，server 和 web 都复用同一份定义，便于 agent 在固定场景下快速验证映射和 UI 展示。首次在本机运行 Playwright 前需要先安装一次 Chromium。
+另外，`ManagedEntity` 的运行时 payload 校验保留在 `@sandboxd/core`，而 fixture/fallback 场景现在归 `apps/server` 的 metadata adapter 管理，避免把测试数据污染到 domain 包。首次在本机运行 Playwright 前需要先安装一次 Chromium。
 
 ## 参考资料
 

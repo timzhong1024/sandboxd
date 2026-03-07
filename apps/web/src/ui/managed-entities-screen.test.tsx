@@ -1,0 +1,25 @@
+import { render, screen } from "@testing-library/react";
+import { expect, test } from "vitest";
+import { ManagedEntitiesScreen } from "./managed-entities-screen";
+
+test("renders managed entities and badges", () => {
+  render(
+    <ManagedEntitiesScreen
+      error={null}
+      entities={[
+        {
+          kind: "sandbox-service",
+          origin: "sandboxd",
+          unitName: "lab-api.service",
+          unitType: "service",
+          state: "active",
+          labels: {},
+        },
+      ]}
+    />,
+  );
+
+  expect(screen.getByText("lab-api.service")).toBeInTheDocument();
+  expect(screen.getByText("sandbox-service")).toBeInTheDocument();
+  expect(screen.getByText("sandboxd")).toBeInTheDocument();
+});

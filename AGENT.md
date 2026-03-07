@@ -44,6 +44,42 @@ Sandboxd 是一个 systemd-first 的 homelab sandbox manager。
 - 如果运行环境不是 Linux，或者 `systemctl` 不可用，则自动退回 fixture inventory
 - 不要为了让本机开发通过而去删除这层降级；它是当前跨平台开发的必要支撑
 
+## 当前分层约束
+
+为了提高 agent 并行开发效率，当前代码默认遵守以下分层：
+
+- `packages/core`
+  - 只放 domain model、纯映射、纯解析、纯校验
+  - 不放 fixture、环境变量读取、HTTP、`systemctl` 调用、文件系统读写
+- `apps/server/src/ports`
+  - 只定义 server 内部 use-case 依赖的最小接口
+- `apps/server/src/adapters`
+  - `systemd/*` 只负责访问 runtime
+  - `metadata/*` 只负责 fixture / fallback 或未来 metadata source
+- `apps/server/src/use-cases`
+  - 只负责编排业务步骤，不直接做 HTTP，也不直接暴露 `spawn` 细节
+- `apps/server/src/transport`
+  - 只负责 HTTP 输入输出
+- `apps/web/src/ports`
+  - 只定义前端 use-case 依赖的 client 接口
+- `apps/web/src/transport`
+  - 只负责 API 请求与 payload 解析
+- `apps/web/src/use-cases`
+  - 只负责前端业务动作编排
+- `apps/web/src/view-model`
+  - 只负责 React 状态组织
+- `apps/web/src/ui`
+  - 只负责渲染
+
+依赖方向约束：
+
+- `transport` 可以依赖 `use-cases` / `ports`，不能直接依赖另一端 adapter 的内部细节
+- `use-cases` 可以依赖 `ports` 和 `core`，不能直接 import 不相关 transport
+- `adapters` 可以依赖 `ports` 和 `core`
+- `core` 不能依赖 `server` 或 `web`
+
+如果一个改动同时需要碰 `transport + adapter + domain` 三层以上，先停下来检查是不是边界又被写混了。
+
 ## 统一模型
 
 当前统一实体模型是 `ManagedEntity`，字段保持和 README 一致：

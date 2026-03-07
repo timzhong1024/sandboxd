@@ -1,12 +1,11 @@
 import { createServer } from "node:http";
-import type { ManagedEntityFixtureName } from "@sandboxd/core";
-import { listEntities } from "./entities";
+import type { ManagedEntity } from "@sandboxd/core";
 
-interface BuildAppOptions {
-  fixtureName?: ManagedEntityFixtureName;
+interface CreateAppOptions {
+  listManagedEntities: () => Promise<ManagedEntity[]>;
 }
 
-export function buildApp(options: BuildAppOptions = {}) {
+export function createApp({ listManagedEntities }: CreateAppOptions) {
   return createServer(async (request, response) => {
     if (request.url === "/healthz") {
       response.setHeader("content-type", "application/json");
@@ -16,7 +15,7 @@ export function buildApp(options: BuildAppOptions = {}) {
 
     if (request.url === "/api/entities") {
       response.setHeader("content-type", "application/json");
-      response.end(JSON.stringify(await listEntities(options.fixtureName)));
+      response.end(JSON.stringify(await listManagedEntities()));
       return;
     }
 
