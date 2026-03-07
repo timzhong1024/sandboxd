@@ -126,6 +126,31 @@ test("creates sandbox services through the API", async () => {
   expect(await response.json()).toMatchObject({ unitName: "lab-worker.service" });
 });
 
+test("returns 400 for malformed JSON request bodies", async () => {
+  const server = createServerForTest();
+  servers.add(server);
+  server.listen(0, "127.0.0.1");
+  await once(server, "listening");
+
+  const address = server.address();
+  if (!address || typeof address === "string") {
+    throw new TypeError("Expected an ephemeral TCP port");
+  }
+
+  const response = await fetch(`http://127.0.0.1:${address.port}/api/sandbox-services`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+    },
+    body: '{"name":"lab-worker"',
+  });
+
+  expect(response.status).toBe(400);
+  await expect(response.json()).resolves.toMatchObject({
+    error: "Request body must be valid JSON",
+  });
+});
+
 test("returns healthz status", async () => {
   const server = createServerForTest();
   servers.add(server);

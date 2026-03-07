@@ -128,13 +128,9 @@ export function getManagedEntityCapabilities(
 }
 
 export function mapSystemdUnitRecord(record: SystemdUnitRecord): ManagedEntitySummary {
-  const managedBySandboxd =
-    record.unitName.startsWith("sandboxd-") ||
-    record.unitName.startsWith("lab-") ||
-    record.description.toLowerCase().includes("sandboxd");
   const summary: ManagedEntitySummary = {
-    kind: managedBySandboxd ? "sandbox-service" : "systemd-unit",
-    origin: managedBySandboxd ? "sandboxd" : "external",
+    kind: "systemd-unit",
+    origin: "external",
     unitName: record.unitName,
     unitType: getUnitType(record.unitName),
     state: record.activeState,
@@ -142,10 +138,9 @@ export function mapSystemdUnitRecord(record: SystemdUnitRecord): ManagedEntitySu
     loadState: record.loadState,
     slice: record.slice,
     description: record.description,
-    sandboxProfile: managedBySandboxd ? "unknown" : undefined,
     labels: {},
     capabilities: getManagedEntityCapabilities({
-      origin: managedBySandboxd ? "sandboxd" : "external",
+      origin: "external",
       state: record.activeState,
     }),
   };

@@ -11,6 +11,13 @@ import {
 import { ZodError } from "zod";
 import { ManagedEntityConflictError, ManagedEntityNotFoundError } from "@sandboxd/control-plane";
 
+class InvalidJsonBodyError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "InvalidJsonBodyError";
+  }
+}
+
 interface CreateAppOptions {
   handleMcpRequest?: (request: IncomingMessage, response: ServerResponse) => Promise<boolean>;
   listManagedEntities: () => Promise<ManagedEntitySummary[]>;
@@ -101,6 +108,11 @@ export function createApp({
         return;
       }
 
+      if (error instanceof InvalidJsonBodyError) {
+        sendJson(response, 400, { error: error.message });
+        return;
+      }
+
       sendJson(response, 500, {
         error: error instanceof Error ? error.message : "Internal Server Error",
       });
@@ -125,7 +137,9 @@ async function readJsonBody(request: IncomingMessage) {
     return {};
   }
 
-  // Stage 1 leaves malformed JSON on the generic 500 path to keep the transport thin.
-  // Known gap: this should become a 400 once request validation/error mapping is tightened.
-  return JSON.parse(Buffer.concat(chunks).toString("utf8"));
+  try {
+    return JSON.parse(Buffer.concat(chunks).toString("utf8"));
+  } catch {
+    throw new InvalidJsonBodyError("Request body must be valid JSON");
+  }
 }

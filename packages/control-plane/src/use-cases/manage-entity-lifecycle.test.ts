@@ -198,3 +198,27 @@ test("rejects actions for non-managed entities", async () => {
   );
   expect(runtime.stopUnit).not.toHaveBeenCalled();
 });
+
+test("rejects actions for units that only look sandboxd-managed by naming", async () => {
+  const metadataSource = createMetadataSource();
+  vi.mocked(metadataSource.getManagedEntityMetadata).mockResolvedValue(null);
+  const runtime = createRuntime({
+    getUnit: vi.fn().mockResolvedValue({
+      unitName: "lab-api.service",
+      loadState: "loaded",
+      activeState: "active",
+      subState: "running",
+      description: "Sandboxd managed lab API",
+    }),
+  });
+
+  const restartManagedEntity = createRestartManagedEntity({
+    metadataSource,
+    systemdRuntime: runtime,
+  });
+
+  await expect(restartManagedEntity("lab-api.service")).rejects.toBeInstanceOf(
+    ManagedEntityConflictError,
+  );
+  expect(runtime.restartUnit).not.toHaveBeenCalled();
+});
