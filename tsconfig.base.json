@@ -15,7 +15,6 @@
     "useDefineForClassFields": true,
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
-    "baseUrl": ".",
     "paths": {
       "@sandboxd/core": ["packages/core/src/index.ts"]
     }
