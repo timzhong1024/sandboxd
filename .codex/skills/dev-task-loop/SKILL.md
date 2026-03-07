@@ -46,6 +46,7 @@ git diff -- <path>
 ```
 
 检查点：
+
 - 改动是否刚好对应需求，没有顺手混入无关重构。
 - 测试是否随行为变化同步更新。
 - 文档或配置是否因为这次改动而失真。
@@ -55,6 +56,7 @@ git diff -- <path>
 先跑与改动最接近的验证，再决定是否扩到全量验证。
 
 执行顺序：
+
 1. 跑单测或单模块验证。
 2. 跑仓库定义的聚合验证命令。
 3. 如果 PR 会触发特定 CI，再尽量在本地复现对应命令。
@@ -68,6 +70,7 @@ rg -n "name:|run:" .github/workflows
 ```
 
 报告验证结果时必须包含：
+
 - 实际执行的命令
 - 成功 / 失败
 - 失败时的第一个有效报错
@@ -226,6 +229,7 @@ gh pr create --base <base> --head <branch> --title "<title>" --body-file <file>
 ```
 
 PR 描述至少写清楚四件事：
+
 - 改了什么
 - 为什么这样改
 - 本地怎么验证的
@@ -236,6 +240,7 @@ PR 描述至少写清楚四件事：
 ### 7. Follow PR Until Stable
 
 PR 创建后不要只看是否 open，要继续检查：
+
 - CI 是否通过
 - reviewDecision 是否为空、approved、changes requested
 - 是否有 review comments / line comments
@@ -256,6 +261,7 @@ gh run view <run-id> --job <job-id> --log-failed
 ```
 
 分析失败日志时，不要整段转述。提炼成四项：
+
 - 失败工作流 / job 名称
 - 失败阶段或命令
 - 第一条有效错误
@@ -277,6 +283,7 @@ gh api repos/<owner>/<repo>/pulls/<pr>/comments
 ```
 
 处理 review 的顺序固定为：
+
 1. 先归类 comment：bug、风格、误解、待确认。
 2. 对合理问题改代码并补验证。
 3. 对不合理或信息不足的问题，给出技术解释或追问。
@@ -291,6 +298,7 @@ gh pr view <pr> --json state,reviewDecision,mergeStateStatus,statusCheckRollup,u
 ```
 
 结束语必须明确当前处于哪一种状态：
+
 - 已完成，等待 merge
 - 已完成，等待 reviewer
 - 已修复，等待 CI 重跑
@@ -317,6 +325,7 @@ gh run view <run-id> --job <job-id> --log-failed
 ```
 
 5. 从日志里只抓这三类信息：
+
 - 第一个失败的命令
 - 第一个带文件和行号的错误
 - 能解释失败原因的上下文 1 到 3 行
@@ -324,12 +333,12 @@ gh run view <run-id> --job <job-id> --log-failed
 6. 回答时使用固定结构：
 
 1. 当前 PR 状态
-2. 失败 check 列表
-3. 每个失败项的根因
-4. 建议的最小修复动作
-5. 是否可以本地复现
+1. 失败 check 列表
+1. 每个失败项的根因
+1. 建议的最小修复动作
+1. 是否可以本地复现
 
-7. 如果能从仓库直接验证，继续本地复现，不要停在日志阅读。
+1. 如果能从仓库直接验证，继续本地复现，不要停在日志阅读。
 
 ## Operating Rules
 
