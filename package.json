@@ -6,6 +6,7 @@
   "scripts": {
     "build": "pnpm -r build",
     "ci": "pnpm verify",
+    "dev": "pnpm -r --parallel --filter @sandboxd/server --filter @sandboxd/web dev",
     "dev:server": "pnpm --filter @sandboxd/server dev",
     "dev:web": "pnpm --filter @sandboxd/web dev",
     "format": "oxfmt --write .",

@@ -282,6 +282,12 @@ MCP 的职责是让 agent 在“受管对象”这个抽象层上工作，而不
 pnpm install
 ```
 
+一键启动服务端和 WebUI：
+
+```bash
+pnpm dev
+```
+
 启动服务端：
 
 ```bash
