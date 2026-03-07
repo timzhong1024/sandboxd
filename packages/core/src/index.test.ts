@@ -6,6 +6,7 @@ import {
   mapSystemdUnitDetailRecord,
   mapSystemdUnitRecord,
   parseCreateSandboxServiceInput,
+  parseDangerousAdoptManagedEntityInput,
   parseManagedEntityDetail,
   parseManagedEntitySummaries,
   type ManagedEntitySummary,
@@ -101,6 +102,14 @@ test("parses a valid create sandbox service input payload", () => {
   expect(input.name).toBe("lab-api");
 });
 
+test("parses a valid dangerous adopt input payload", () => {
+  const input = parseDangerousAdoptManagedEntityInput({
+    sandboxProfile: "strict",
+  });
+
+  expect(input.sandboxProfile).toBe("strict");
+});
+
 test("rejects an invalid managed entity summary payload", () => {
   expect(() => parseManagedEntitySummaries([{ unitName: "broken.service", labels: {} }])).toThrow(
     /"kind"/i,
@@ -146,9 +155,32 @@ test("maps a systemd unit detail record into the shared detail model", () => {
     },
   });
 
-  expect(entity.kind).toBe("sandbox-service");
+  expect(entity.kind).toBe("systemd-unit");
+  expect(entity.origin).toBe("external");
   expect(entity.resourceControls.cpuWeight).toBe("200");
   expect(entity.sandboxing.noNewPrivileges).toBe(true);
+});
+
+test("does not infer sandboxd ownership from unit naming or description", () => {
+  const entity = mapSystemdUnitRecord({
+    unitName: "lab-api.service",
+    loadState: "loaded",
+    activeState: "active",
+    subState: "running",
+    description: "Sandboxd managed lab API",
+  });
+
+  expect(entity).toMatchObject({
+    kind: "systemd-unit",
+    origin: "external",
+    capabilities: {
+      canInspect: true,
+      canStart: false,
+      canStop: false,
+      canRestart: false,
+    },
+  });
+  expect(entity.sandboxProfile).toBeUndefined();
 });
 
 test("extracts a unit type suffix from the unit name", () => {

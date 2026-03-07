@@ -48,6 +48,7 @@ test("registers all v1 tools", async () => {
     startManagedEntity: vi.fn().mockResolvedValue(createEntityDetail()),
     stopManagedEntity: vi.fn().mockResolvedValue(createEntityDetail()),
     restartManagedEntity: vi.fn().mockResolvedValue(createEntityDetail()),
+    dangerouslyAdoptManagedEntity: vi.fn().mockResolvedValue(createEntityDetail("docker.service")),
     createSandboxService: vi.fn().mockResolvedValue(createEntityDetail("lab-worker.service")),
   });
   const client = new Client({
@@ -65,6 +66,7 @@ test("registers all v1 tools", async () => {
 
   expect(toolNames).toEqual([
     "create_sandboxed_service",
+    "dangerously_adopt_service",
     "inspect",
     "list",
     "restart",
@@ -81,6 +83,7 @@ test("invokes injected handlers and returns JSON text payloads", async () => {
     startManagedEntity: vi.fn().mockResolvedValue(createEntityDetail()),
     stopManagedEntity: vi.fn().mockResolvedValue(createEntityDetail()),
     restartManagedEntity: vi.fn().mockResolvedValue(createEntityDetail()),
+    dangerouslyAdoptManagedEntity: vi.fn().mockResolvedValue(createEntityDetail("docker.service")),
     createSandboxService: vi.fn().mockResolvedValue(createEntityDetail("lab-worker.service")),
   });
   const client = new Client({

@@ -35,6 +35,7 @@ Sandboxd 是一个 systemd-first 的 homelab sandbox manager。
 
 - `packages/core` 导出 `ManagedEntitySummary`、`ManagedEntityDetail`、`CreateSandboxServiceInput` 等共享契约
 - `packages/control-plane` 提供真实可复用的 metadata/runtime adapter 与业务编排
+- sandboxd ownership 不再落在 `/var/lib/sandboxd` 之类的独立状态目录，默认贴在 systemd unit / drop-in 的 `X-Sandboxd` 段
 - `apps/server` 提供：
   - `GET /healthz`
   - `GET /api/entities`
@@ -42,6 +43,7 @@ Sandboxd 是一个 systemd-first 的 homelab sandbox manager。
   - `POST /api/entities/:unitName/start`
   - `POST /api/entities/:unitName/stop`
   - `POST /api/entities/:unitName/restart`
+  - `POST /api/entities/:unitName/dangerous-adopt`
   - `POST /api/sandbox-services`
   - `POST /mcp`
 - `apps/web` 已经完成列表、详情、动作、创建的单页工作台
@@ -118,6 +120,7 @@ Sandboxd 是一个 systemd-first 的 homelab sandbox manager。
 - `ManagedEntitySummary`
 - `ManagedEntityDetail`
 - `CreateSandboxServiceInput`
+- `DangerousAdoptManagedEntityInput`
 
 其中：
 
@@ -154,6 +157,8 @@ Sandboxd 是一个 systemd-first 的 homelab sandbox manager。
 - `vm`
 
 V1 真正实现的只有前两类。`container` 和 `vm` 现在只是保留枚举，不要假装已经支持。
+
+当前不要把 `scope` 当成用户可直接操作的对象。它通常不是用户直接管理的持久化单元，如果未来内部实现需要用到 `scope`，也应保持为对用户透明的实现细节。
 
 ## 当前技术约束
 

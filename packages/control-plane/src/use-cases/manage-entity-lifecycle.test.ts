@@ -36,6 +36,8 @@ function createEntityDetail(unitName = "lab-api.service", state = "active") {
 function createMetadataSource(): ManagedEntityMetadataSourcePort {
   return {
     deleteManagedEntityMetadata: vi.fn(),
+    dangerouslyAdoptFallbackEntity: vi.fn().mockResolvedValue(null),
+    dangerouslyAdoptManagedEntity: vi.fn(),
     listFallbackEntitySummaries: vi.fn().mockResolvedValue([]),
     listManagedEntityMetadata: vi.fn().mockResolvedValue([]),
     getManagedEntityMetadata: vi.fn().mockResolvedValue({
@@ -67,6 +69,7 @@ function createRuntime(overrides: Partial<SystemdRuntimePort>): SystemdRuntimePo
       subState: "running",
       description: "Sandboxd managed lab API",
     }),
+    reloadSystemd: vi.fn().mockResolvedValue(undefined),
     startUnit: vi.fn().mockResolvedValue(undefined),
     stopUnit: vi.fn().mockResolvedValue(undefined),
     restartUnit: vi.fn().mockResolvedValue(undefined),
@@ -197,4 +200,28 @@ test("rejects actions for non-managed entities", async () => {
     ManagedEntityConflictError,
   );
   expect(runtime.stopUnit).not.toHaveBeenCalled();
+});
+
+test("rejects actions for units that only look sandboxd-managed by naming", async () => {
+  const metadataSource = createMetadataSource();
+  vi.mocked(metadataSource.getManagedEntityMetadata).mockResolvedValue(null);
+  const runtime = createRuntime({
+    getUnit: vi.fn().mockResolvedValue({
+      unitName: "lab-api.service",
+      loadState: "loaded",
+      activeState: "active",
+      subState: "running",
+      description: "Sandboxd managed lab API",
+    }),
+  });
+
+  const restartManagedEntity = createRestartManagedEntity({
+    metadataSource,
+    systemdRuntime: runtime,
+  });
+
+  await expect(restartManagedEntity("lab-api.service")).rejects.toBeInstanceOf(
+    ManagedEntityConflictError,
+  );
+  expect(runtime.restartUnit).not.toHaveBeenCalled();
 });

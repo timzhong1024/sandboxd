@@ -39,7 +39,7 @@ Sandboxd 解决的是单机 homelab 场景下的“把杂乱的 service、sandbo
 
 - 读取系统级 systemd manager 中的全部 units，并在 WebUI 展示。
 - 定义并展示统一的 `ManagedEntity` 视图。
-- 创建和管理由 Sandboxd 托管的普通 sandboxed service / scope。
+- 创建和管理由 Sandboxd 托管的普通 sandboxed service。
 - 对 Sandboxd 托管对象附加基础资源控制与安全沙箱配置。
 - 通过 WebUI、CLI、MCP 暴露一致的动作语义：`list`、`inspect`、`start`、`stop`、`restart`、`create sandboxed service`。
 
@@ -137,12 +137,12 @@ export interface CreateSandboxServiceInput {
 
 分类规则：
 
-| 类别              | systemd 背书                       | V1 状态 | WebUI 表现                                            |
-| ----------------- | ---------------------------------- | ------- | ----------------------------------------------------- |
-| `systemd-unit`    | 宿主机已有 unit                    | 已实现  | 普通 unit，显示 `external` 或 `sandboxd-managed` 标签 |
-| `sandbox-service` | `service` / `scope` + 专用 `slice` | 已实现  | 特殊高亮，显示资源与沙箱信息                          |
-| `container`       | 未来映射到 unit-backed container   | 预留    | 特殊图标和分类                                        |
-| `vm`              | 未来映射到 wrapped QEMU unit       | 预留    | 特殊图标和分类                                        |
+| 类别              | systemd 背书                     | V1 状态 | WebUI 表现                                            |
+| ----------------- | -------------------------------- | ------- | ----------------------------------------------------- |
+| `systemd-unit`    | 宿主机已有 unit                  | 已实现  | 普通 unit，显示 `external` 或 `sandboxd-managed` 标签 |
+| `sandbox-service` | `service` + 专用 `slice`         | 已实现  | 特殊高亮，显示资源与沙箱信息                          |
+| `container`       | 未来映射到 unit-backed container | 预留    | 特殊图标和分类                                        |
+| `vm`              | 未来映射到 wrapped QEMU unit     | 预留    | 特殊图标和分类                                        |
 
 项目托管对象的生命周期仍以 systemd 为准。Sandboxd 负责的是发现、命名、元数据、展示和操作入口，而不是自己维护一套平行状态机。
 
@@ -160,7 +160,7 @@ flowchart LR
   P --> R["runtime adapter"]
   R --> D["systemd D-Bus / systemctl / busctl"]
   R --> U["unit files / transient units"]
-  P --> F["/var/lib/sandboxd metadata"]
+  P --> F["X-Sandboxd unit/drop-in metadata"]
 ```
 
 ### 组件划分
@@ -190,9 +190,11 @@ flowchart LR
 ### systemd 绑定策略
 
 - 持久化对象优先使用真实 unit file。
-- 瞬时对象可使用 transient unit / scope。
-- 项目托管对象的元数据采用 filesystem-first，保存在 `/var/lib/sandboxd/`。
+- 瞬时对象未来如有需要可使用 transient unit，但这应保持为实现细节。
+- 项目托管对象的 ownership 元数据优先贴在 systemd unit / drop-in 中的 `X-Sandboxd` 段。
 - unit 的真实状态、依赖关系、启动顺序和故障语义一律以 systemd 为源。
+
+V1 不把 `scope` 暴露成用户可直接操作的对象类型。`scope` 通常不是用户直接使用的持久化管理单元，也不一定长期存在；如果后续内部实现需要借助它，也应该保持对用户透明。
 
 V1 不承诺数据库，也不承诺自定义 agent runtime。所有复杂度都优先压进 systemd 原语和少量附加元数据。
 
@@ -298,6 +300,7 @@ sandboxctl inspect nginx.service
 sandboxctl start my-lab.service
 sandboxctl stop my-lab.service
 sandboxctl restart my-lab.service
+sandboxctl dangerous-adopt docker.service --profile baseline
 sandboxctl create sandboxed-service my-lab --cpu-weight 200 --memory-max 512M --profile strict
 ```
 
@@ -308,6 +311,7 @@ CLI 的目标不是包一层与 systemctl 冲突的方言，而是暴露 Sandbox
 - 本机直接依赖 shared control-plane，不需要先启动 `server`
 - 所有命令支持 `--json`
 - 创建、读写动作都直接走本地 runtime / metadata adapter
+- 额外提供 `dangerous-adopt`，可把已有 systemd service 标记为 sandboxd owned
 
 ### MCP
 
@@ -325,6 +329,7 @@ MCP 的职责是让 agent 在“受管对象”这个抽象层上工作，而不
 - server 通过 `POST /mcp` 暴露无状态 MCP HTTP endpoint
 - MCP tool 定义在独立的 `apps/mcp` workspace
 - MCP 直接复用 shared control-plane，不走本地 HTTP 回环
+- 额外暴露危险工具，把已有 systemd service 标记为 sandboxd owned
 
 未来如果扩展 container / VM，MCP 也复用同一 `ManagedEntity` 模型，而不是新增一套旁路工具。
 
@@ -338,6 +343,7 @@ GET  /api/entities/:unitName
 POST /api/entities/:unitName/start
 POST /api/entities/:unitName/stop
 POST /api/entities/:unitName/restart
+POST /api/entities/:unitName/dangerous-adopt
 POST /api/sandbox-services
 POST /mcp
 ```
@@ -347,6 +353,7 @@ POST /mcp
 - `GET /api/entities` 返回 `ManagedEntitySummary[]`
 - `GET /api/entities/:unitName` 返回 `ManagedEntityDetail`
 - 三个动作接口返回动作后的 `ManagedEntityDetail`
+- `POST /api/entities/:unitName/dangerous-adopt` 接收危险认领入参并返回动作后的 `ManagedEntityDetail`
 - `POST /api/sandbox-services` 接收 `CreateSandboxServiceInput` 并返回新建对象的 `ManagedEntityDetail`
 
 ### 典型场景
@@ -360,7 +367,7 @@ POST /mcp
 场景二：创建一个受限 service
 
 - 用户通过 CLI 或 WebUI 创建一个新的项目托管 service。
-- 该对象最终以 `service` 或 `scope` 形式存在，并挂到专用 `slice` 下。
+- 该对象最终以 `service` 形式存在，并挂到专用 `slice` 下。
 - 常见 V1 约束包括 `CPUWeight=`、`MemoryMax=`、`NoNewPrivileges=`、`PrivateTmp=`、`ProtectSystem=` 等。
 
 场景三：未来 container / VM 的展示方式
@@ -380,7 +387,7 @@ POST /mcp
 
 ### Phase 2: Sandboxed Service
 
-- 支持创建、更新、删除项目托管的 `service` / `scope`。
+- 支持创建、更新、删除项目托管的 `service`。
 - 支持基础资源控制：CPU、内存、slice 归属。
 - 支持基础安全沙箱：文件系统隔离、权限收缩、临时目录隔离。
 - 在 WebUI 中展示 profile 与实际 unit 配置的映射关系。

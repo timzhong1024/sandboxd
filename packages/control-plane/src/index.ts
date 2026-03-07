@@ -3,6 +3,7 @@ import { createFilesystemMetadataSource } from "./adapters/metadata/filesystem-s
 import { createFixtureMetadataSource, parseFixtureName } from "./adapters/metadata/fixture-source";
 import { createSystemctlRuntime } from "./adapters/systemd/systemctl-runtime";
 import { createCreateSandboxService } from "./use-cases/create-sandbox-service";
+import { createDangerouslyAdoptManagedEntity } from "./use-cases/dangerously-adopt-managed-entity";
 import { createInspectManagedEntity } from "./use-cases/inspect-managed-entity";
 import { createListManagedEntities } from "./use-cases/list-managed-entities";
 import { createRestartManagedEntity } from "./use-cases/restart-managed-entity";
@@ -22,6 +23,7 @@ export type { SystemdRuntimePort } from "./ports/systemd-runtime-port";
 
 export interface ControlPlane {
   createSandboxService: ReturnType<typeof createCreateSandboxService>;
+  dangerouslyAdoptManagedEntity: ReturnType<typeof createDangerouslyAdoptManagedEntity>;
   inspectManagedEntity: ReturnType<typeof createInspectManagedEntity>;
   listManagedEntities: ReturnType<typeof createListManagedEntities>;
   restartManagedEntity: ReturnType<typeof createRestartManagedEntity>;
@@ -63,6 +65,10 @@ export function createControlPlane(environment: NodeJS.ProcessEnv = process.env)
       systemdRuntime,
     }),
     createSandboxService: createCreateSandboxService({
+      metadataSource,
+      systemdRuntime,
+    }),
+    dangerouslyAdoptManagedEntity: createDangerouslyAdoptManagedEntity({
       metadataSource,
       systemdRuntime,
     }),

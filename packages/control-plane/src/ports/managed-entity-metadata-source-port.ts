@@ -1,5 +1,6 @@
 import type {
   CreateSandboxServiceInput,
+  DangerousAdoptManagedEntityInput,
   ManagedEntityDetail,
   ManagedEntitySummary,
   ResourceControls,
@@ -22,6 +23,14 @@ export interface ManagedEntityMetadataRecord {
 
 export interface ManagedEntityMetadataSourcePort {
   deleteManagedEntityMetadata(unitName: string): Promise<void>;
+  dangerouslyAdoptFallbackEntity(
+    unitName: string,
+    input: DangerousAdoptManagedEntityInput,
+  ): Promise<ManagedEntityDetail | null>;
+  dangerouslyAdoptManagedEntity(
+    unitName: string,
+    input: DangerousAdoptManagedEntityInput,
+  ): Promise<ManagedEntityMetadataRecord>;
   getManagedEntityMetadata(unitName: string): Promise<ManagedEntityMetadataRecord | null>;
   listFallbackEntitySummaries(options?: {
     fixtureName?: ManagedEntityFixtureName;

@@ -1,5 +1,6 @@
 import type {
   CreateSandboxServiceInput,
+  DangerousAdoptManagedEntityInput,
   ManagedEntityDetail,
   ManagedEntitySummary,
 } from "@sandboxd/core";
@@ -150,6 +151,43 @@ export function createFixtureMetadataSource(
   }
 
   return {
+    async dangerouslyAdoptFallbackEntity(
+      unitName: string,
+      input: DangerousAdoptManagedEntityInput,
+    ) {
+      const fixture = store[defaultFixtureName];
+      const index = fixture.findIndex((entity) => entity.unitName === unitName);
+      if (index === -1) {
+        return null;
+      }
+
+      const previous = fixture[index];
+      if (!previous) {
+        return null;
+      }
+
+      const next: ManagedEntityDetail = {
+        ...previous,
+        kind: "sandbox-service",
+        origin: "sandboxd",
+        sandboxProfile: input.sandboxProfile ?? previous.sandboxProfile,
+        capabilities: createCapabilities("sandboxd", previous.state),
+      };
+
+      fixture[index] = next;
+      return cloneEntity(next);
+    },
+    async dangerouslyAdoptManagedEntity(unitName, input) {
+      return compactMetadataRecord({
+        unitName,
+        sandboxProfile: input.sandboxProfile,
+        resourceControls: {},
+        sandboxing: {},
+        slice: "sandboxd.slice",
+        description: undefined,
+        workingDirectory: undefined,
+      });
+    },
     async deleteManagedEntityMetadata() {},
     async getManagedEntityMetadata(): Promise<ManagedEntityMetadataRecord | null> {
       return null;

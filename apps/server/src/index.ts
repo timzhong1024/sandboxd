@@ -12,6 +12,7 @@ const app = createApp({
   startManagedEntity: controlPlane.startManagedEntity,
   stopManagedEntity: controlPlane.stopManagedEntity,
   restartManagedEntity: controlPlane.restartManagedEntity,
+  dangerouslyAdoptManagedEntity: controlPlane.dangerouslyAdoptManagedEntity,
   createSandboxService: controlPlane.createSandboxService,
 });
 

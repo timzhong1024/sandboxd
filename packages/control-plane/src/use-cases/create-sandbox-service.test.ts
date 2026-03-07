@@ -6,6 +6,8 @@ import { createCreateSandboxService } from "./create-sandbox-service";
 function createMetadataSource(): ManagedEntityMetadataSourcePort {
   return {
     deleteManagedEntityMetadata: vi.fn().mockResolvedValue(undefined),
+    dangerouslyAdoptFallbackEntity: vi.fn().mockResolvedValue(null),
+    dangerouslyAdoptManagedEntity: vi.fn(),
     getFallbackEntityDetail: vi.fn().mockResolvedValue(null),
     getManagedEntityMetadata: vi.fn().mockResolvedValue({
       unitName: "lab-api.service",
@@ -50,6 +52,7 @@ function createRuntime(overrides: Partial<SystemdRuntimePort>): SystemdRuntimePo
       sandboxing: {},
     }),
     listUnits: vi.fn().mockResolvedValue([]),
+    reloadSystemd: vi.fn().mockResolvedValue(undefined),
     restartUnit: vi.fn().mockResolvedValue(undefined),
     startUnit: vi.fn().mockResolvedValue(undefined),
     stopUnit: vi.fn().mockResolvedValue(undefined),

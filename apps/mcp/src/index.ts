@@ -1,10 +1,14 @@
 import { type ControlPlane } from "@sandboxd/control-plane";
-import { createSandboxServiceInputSchema } from "@sandboxd/core";
+import {
+  createSandboxServiceInputSchema,
+  dangerousAdoptManagedEntityInputSchema,
+} from "@sandboxd/core";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 
 export interface SandboxdMcpContext {
   createSandboxService: ControlPlane["createSandboxService"];
+  dangerouslyAdoptManagedEntity: ControlPlane["dangerouslyAdoptManagedEntity"];
   inspectManagedEntity: ControlPlane["inspectManagedEntity"];
   listManagedEntities: ControlPlane["listManagedEntities"];
   restartManagedEntity: ControlPlane["restartManagedEntity"];
@@ -68,6 +72,19 @@ export function createSandboxdMcpServer(context: SandboxdMcpContext) {
       },
     },
     async ({ unitName }) => createJsonToolResult(await context.restartManagedEntity(unitName)),
+  );
+
+  server.registerTool(
+    "dangerously_adopt_service",
+    {
+      description: "Dangerously mark an existing systemd service as sandboxd-managed.",
+      inputSchema: {
+        unitName: z.string().min(1),
+        ...dangerousAdoptManagedEntityInputSchema.shape,
+      },
+    },
+    async ({ unitName, ...input }) =>
+      createJsonToolResult(await context.dangerouslyAdoptManagedEntity(unitName, input)),
   );
 
   server.registerTool(
