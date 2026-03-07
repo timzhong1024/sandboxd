@@ -1,6 +1,7 @@
 import { mapSystemdUnitDetailRecord, type ManagedEntityDetail } from "@sandboxd/core";
 import type { ManagedEntityMetadataSourcePort } from "../ports/managed-entity-metadata-source-port";
 import type { SystemdRuntimePort } from "../ports/systemd-runtime-port";
+import { shouldFallbackToMetadata } from "./systemd-runtime-fallback";
 
 interface CreateInspectManagedEntityOptions {
   metadataSource: ManagedEntityMetadataSourcePort;
@@ -17,15 +18,19 @@ export function createInspectManagedEntity({
       if (record) {
         return mapSystemdUnitDetailRecord(record);
       }
-    } catch {
-      // Fall through to metadata source.
+    } catch (error: unknown) {
+      if (!shouldFallbackToMetadata(error)) {
+        throw error;
+      }
+
+      const fallbackEntity = await metadataSource.getFallbackEntityDetail(unitName);
+      if (!fallbackEntity) {
+        throw new Error(`Managed entity not found: ${unitName}`);
+      }
+
+      return fallbackEntity;
     }
 
-    const fallbackEntity = await metadataSource.getFallbackEntityDetail(unitName);
-    if (!fallbackEntity) {
-      throw new Error(`Managed entity not found: ${unitName}`);
-    }
-
-    return fallbackEntity;
+    throw new Error(`Managed entity not found: ${unitName}`);
   };
 }

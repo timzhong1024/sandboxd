@@ -111,5 +111,7 @@ async function readJsonBody(request: IncomingMessage) {
     return {};
   }
 
+  // Stage 1 leaves malformed JSON on the generic 500 path to keep the transport thin.
+  // Known gap: this should become a 400 once request validation/error mapping is tightened.
   return JSON.parse(Buffer.concat(chunks).toString("utf8"));
 }
