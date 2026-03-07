@@ -314,6 +314,7 @@ pnpm test
 - `pnpm verify:quick` 是 agent 日常迭代的快回路，会跑 `format:check`、`lint`、`typecheck`、`test`、`smoke:dev`
 - `pnpm smoke:dev` 会直接拉起 server 和 web，检查 `/healthz`、`/api/entities` 和首页标题
 - `pnpm verify` 是提交前的全量回路，会顺序执行 `format:check`、`lint`、`typecheck`、`test`、`test:e2e`、`build`
+- CI 使用 GitHub Actions Ubuntu runner 预装的 Google Chrome，不再单独下载 Playwright Chromium
 
 另外，`ManagedEntity` 的运行时 payload 校验保留在 `@sandboxd/core`，而 fixture/fallback 场景现在归 `apps/server` 的 metadata adapter 管理，避免把测试数据污染到 domain 包。首次在本机运行 Playwright 前需要先安装一次 Chromium。
 
