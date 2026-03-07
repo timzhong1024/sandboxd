@@ -38,6 +38,9 @@ importers:
 
   apps/cli:
     dependencies:
+      '@sandboxd/control-plane':
+        specifier: workspace:*
+        version: link:../../packages/control-plane
       '@sandboxd/core':
         specifier: workspace:*
         version: link:../../packages/core
