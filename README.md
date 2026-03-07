@@ -51,6 +51,12 @@ Sandboxd 解决的是单机 homelab 场景下的“把杂乱的 service、sandbo
 - 完整虚拟化平台、高级网络/存储编排。
 - 数据库优先的控制面设计。
 
+### V1 当前状态
+
+- V1 所需的控制面逻辑已经快速实现完成：WebUI、CLI、MCP、HTTP API 和 shared control-plane 都已闭环。
+- 当前状态应理解为“逻辑实现完成”，不是“实机验证完成”。
+- 目前仍缺少在真实宿主机 systemd 环境上的系统性实机验证，尤其是创建、dangerous adopt、drop-in ownership 标记和真实权限边界。
+
 ### 运行假设
 
 - 目标平台是启用 unified cgroup v2 的现代 Linux systemd 主机。

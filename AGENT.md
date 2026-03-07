@@ -67,6 +67,12 @@ Sandboxd 是一个 systemd-first 的 homelab sandbox manager。
 - 如果运行环境不是 Linux，或者 `systemctl` 不可用，则自动退回 fixture inventory
 - 不要为了让本机开发通过而去删除这层降级；它是当前跨平台开发的必要支撑
 
+当前交付状态：
+
+- V1 控制面逻辑已经快速实现完成，代码层面已形成 Web / CLI / MCP / HTTP 的闭环。
+- 这不等于已经完成真实机器验证；当前默认仍要把“实机可用性”视为待确认项。
+- 尤其涉及真实 systemd 写路径、drop-in ownership 标记、dangerous adopt 和宿主机权限边界时，不要把本地测试通过误写成“已在实机验证通过”。
+
 当前 runtime-systemd 演进默认决策：
 
 - 不把“迁移到 `dbus-next`”本身当成目标；优先稳定 runtime port 边界
