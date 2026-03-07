@@ -7,6 +7,10 @@ const listUnitsArgs = ["list-units", "--all", "--plain", "--no-legend", "--no-pa
 export function createSystemctlRuntime(): SystemdRuntimePort {
   return {
     async listUnits() {
+      if (shouldUseFixture()) {
+        throw new Error("systemctl runtime disabled while fixture mode is enabled");
+      }
+
       if (process.platform !== "linux") {
         throw new Error("systemctl runtime is only available on Linux");
       }
@@ -15,6 +19,14 @@ export function createSystemctlRuntime(): SystemdRuntimePort {
       return parseSystemctlListUnitsOutput(stdout);
     },
   };
+}
+
+export function shouldUseFixture(environment: NodeJS.ProcessEnv = process.env) {
+  if (environment.SANDBOXD_USE_FIXTURE) {
+    return environment.SANDBOXD_USE_FIXTURE !== "0";
+  }
+
+  return Boolean(environment.SANDBOXD_ENTITY_FIXTURE) || process.platform !== "linux";
 }
 
 export function parseSystemctlListUnitsOutput(stdout: string): SystemdUnitRecord[] {

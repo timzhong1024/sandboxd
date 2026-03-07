@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { parseSystemctlListUnitsOutput } from "./systemctl-runtime";
+import { parseSystemctlListUnitsOutput, shouldUseFixture } from "./systemctl-runtime";
 
 test("parses the standard systemctl list-units text format", () => {
   const output = [
@@ -23,4 +23,9 @@ test("parses the standard systemctl list-units text format", () => {
       description: "Sandboxd Root Slice",
     },
   ]);
+});
+
+test("enables fixtures when explicitly requested through the environment", () => {
+  expect(shouldUseFixture({ SANDBOXD_USE_FIXTURE: "1" })).toBe(true);
+  expect(shouldUseFixture({ SANDBOXD_USE_FIXTURE: "0" })).toBe(false);
 });
