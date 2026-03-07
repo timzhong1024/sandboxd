@@ -1,4 +1,5 @@
 import type { ManagedEntity } from "@sandboxd/core";
+import { z } from "zod";
 import {
   managedEntityFixtureNames,
   type ManagedEntityFixtureName,
@@ -52,6 +53,8 @@ interface CreateFixtureMetadataSourceOptions {
   defaultFixtureName?: ManagedEntityFixtureName;
 }
 
+const fixtureNameSchema = z.enum(managedEntityFixtureNames);
+
 export function createFixtureMetadataSource(
   options: CreateFixtureMetadataSourceOptions = {},
 ): ManagedEntityMetadataSourcePort {
@@ -72,9 +75,5 @@ export function parseFixtureName(value: string | undefined): ManagedEntityFixtur
     return undefined;
   }
 
-  if (managedEntityFixtureNames.includes(value as ManagedEntityFixtureName)) {
-    return value as ManagedEntityFixtureName;
-  }
-
-  throw new TypeError(`Unknown entity fixture: ${value}`);
+  return fixtureNameSchema.parse(value);
 }

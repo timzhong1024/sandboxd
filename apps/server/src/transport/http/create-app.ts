@@ -1,5 +1,5 @@
 import { createServer } from "node:http";
-import type { ManagedEntity } from "@sandboxd/core";
+import { parseManagedEntities, type ManagedEntity } from "@sandboxd/core";
 
 interface CreateAppOptions {
   listManagedEntities: () => Promise<ManagedEntity[]>;
@@ -14,8 +14,9 @@ export function createApp({ listManagedEntities }: CreateAppOptions) {
     }
 
     if (request.url === "/api/entities") {
+      const entities = parseManagedEntities(await listManagedEntities());
       response.setHeader("content-type", "application/json");
-      response.end(JSON.stringify(await listManagedEntities()));
+      response.end(JSON.stringify(entities));
       return;
     }
 

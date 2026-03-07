@@ -1,25 +1,41 @@
-export type ManagedEntityKind = "systemd-unit" | "sandbox-service" | "container" | "vm";
+import { z } from "zod";
 
-export type ManagedEntityOrigin = "external" | "sandboxd";
+export const managedEntityKindSchema = z.enum([
+  "systemd-unit",
+  "sandbox-service",
+  "container",
+  "vm",
+]);
 
-export interface ManagedEntity {
-  kind: ManagedEntityKind;
-  origin: ManagedEntityOrigin;
-  unitName: string;
-  unitType: "service" | "scope" | "slice" | "socket" | "target" | "timer" | string;
-  state: string;
-  slice?: string;
-  labels: Record<string, string>;
-  sandboxProfile?: string;
-}
+export const managedEntityOriginSchema = z.enum(["external", "sandboxd"]);
 
-export interface SystemdUnitRecord {
-  unitName: string;
-  loadState: string;
-  activeState: string;
-  subState: string;
-  description: string;
-}
+export const managedEntitySchema = z.object({
+  kind: managedEntityKindSchema,
+  origin: managedEntityOriginSchema,
+  unitName: z.string(),
+  unitType: z.string(),
+  state: z.string(),
+  slice: z.string().optional(),
+  labels: z.record(z.string(), z.string()),
+  sandboxProfile: z.string().optional(),
+});
+
+export const managedEntitiesSchema = z.array(managedEntitySchema);
+
+export const systemdUnitRecordSchema = z.object({
+  unitName: z.string(),
+  loadState: z.string(),
+  activeState: z.string(),
+  subState: z.string(),
+  description: z.string(),
+});
+
+export const systemdUnitRecordsSchema = z.array(systemdUnitRecordSchema);
+
+export type ManagedEntityKind = z.infer<typeof managedEntityKindSchema>;
+export type ManagedEntityOrigin = z.infer<typeof managedEntityOriginSchema>;
+export type ManagedEntity = z.infer<typeof managedEntitySchema>;
+export type SystemdUnitRecord = z.infer<typeof systemdUnitRecordSchema>;
 
 export function isSandboxdManaged(entity: ManagedEntity) {
   return entity.origin === "sandboxd";
@@ -55,92 +71,9 @@ export function mapSystemdUnitRecord(record: SystemdUnitRecord): ManagedEntity {
 }
 
 export function parseManagedEntities(input: unknown): ManagedEntity[] {
-  if (!Array.isArray(input)) {
-    throw new TypeError("Managed entities payload must be an array");
-  }
-
-  return input.map(parseManagedEntity);
+  return managedEntitiesSchema.parse(input);
 }
 
 export function parseManagedEntity(input: unknown): ManagedEntity {
-  if (!isRecord(input)) {
-    throw new TypeError("Managed entity must be an object");
-  }
-
-  const kind = expectString(input.kind, "kind");
-  const origin = expectString(input.origin, "origin");
-  const unitName = expectString(input.unitName, "unitName");
-  const unitType = expectString(input.unitType, "unitType");
-  const state = expectString(input.state, "state");
-  const labels = parseLabels(input.labels);
-  const slice = parseOptionalString(input.slice, "slice");
-  const sandboxProfile = parseOptionalString(input.sandboxProfile, "sandboxProfile");
-
-  if (!isManagedEntityKind(kind)) {
-    throw new TypeError(`Unsupported managed entity kind: ${kind}`);
-  }
-
-  if (!isManagedEntityOrigin(origin)) {
-    throw new TypeError(`Unsupported managed entity origin: ${origin}`);
-  }
-
-  return {
-    kind,
-    origin,
-    unitName,
-    unitType,
-    state,
-    labels,
-    ...(slice === undefined ? {} : { slice }),
-    ...(sandboxProfile === undefined ? {} : { sandboxProfile }),
-  };
-}
-
-function isManagedEntityKind(value: string): value is ManagedEntityKind {
-  return (
-    value === "systemd-unit" ||
-    value === "sandbox-service" ||
-    value === "container" ||
-    value === "vm"
-  );
-}
-
-function isManagedEntityOrigin(value: string): value is ManagedEntityOrigin {
-  return value === "external" || value === "sandboxd";
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
-}
-
-function expectString(value: unknown, field: string): string {
-  if (typeof value !== "string") {
-    throw new TypeError(`Managed entity field "${field}" must be a string`);
-  }
-
-  return value;
-}
-
-function parseOptionalString(value: unknown, field: string): string | undefined {
-  if (value === undefined) {
-    return undefined;
-  }
-
-  return expectString(value, field);
-}
-
-function parseLabels(value: unknown): Record<string, string> {
-  if (!isRecord(value)) {
-    throw new TypeError('Managed entity field "labels" must be an object');
-  }
-
-  return Object.fromEntries(
-    Object.entries(value).map(([key, entryValue]) => {
-      if (typeof entryValue !== "string") {
-        throw new TypeError(`Managed entity label "${key}" must be a string`);
-      }
-
-      return [key, entryValue];
-    }),
-  );
+  return managedEntitySchema.parse(input);
 }

@@ -24,5 +24,5 @@ test("parses a valid fixture name from the environment", () => {
 });
 
 test("rejects an unknown fixture name", () => {
-  expect(() => parseFixtureName("broken")).toThrow(/Unknown entity fixture/i);
+  expect(() => parseFixtureName("broken")).toThrow(/Invalid option/i);
 });
