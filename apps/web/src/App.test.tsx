@@ -35,6 +35,9 @@ test("renders entities returned by the server", async () => {
   expect(await screen.findByText("lab-api.service")).toBeInTheDocument();
   expect(screen.getByText("sandbox-service")).toBeInTheDocument();
   expect(screen.getByText("sandboxd")).toBeInTheDocument();
+  expect(
+    screen.getByText("A homelab control surface with the feel of a compact appliance."),
+  ).toBeInTheDocument();
 });
 
 test("surfaces runtime payload validation errors", async () => {

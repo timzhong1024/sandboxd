@@ -22,4 +22,6 @@ test("renders managed entities and badges", () => {
   expect(screen.getByText("lab-api.service")).toBeInTheDocument();
   expect(screen.getByText("sandbox-service")).toBeInTheDocument();
   expect(screen.getByText("sandboxd")).toBeInTheDocument();
+  expect(screen.getByText("Managed entity inventory")).toBeInTheDocument();
+  expect(screen.getByText("Total entities")).toBeInTheDocument();
 });

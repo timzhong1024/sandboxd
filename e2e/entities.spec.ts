@@ -4,12 +4,19 @@ test("renders the managed entity inventory", async ({ page }) => {
   await page.goto("/");
 
   await expect(
-    page.getByRole("heading", { level: 1, name: "systemd-first homelab sandbox manager" }),
+    page.getByRole("heading", {
+      level: 1,
+      name: "A homelab control surface with the feel of a compact appliance.",
+    }),
   ).toBeVisible();
-  await expect(page.getByRole("heading", { level: 2, name: "Managed Entities" })).toBeVisible();
-  await expect(page.getByText(/items/)).toBeVisible();
+  await expect(
+    page.getByRole("heading", { level: 2, name: "Managed entity inventory" }),
+  ).toBeVisible();
+  await expect(page.getByText("Total entities")).toBeVisible();
+  await expect(page.getByText("lab-api.service")).toBeVisible();
+  await expect(page.getByText("sandbox-service")).toBeVisible();
 
-  const cards = page.locator(".entity-card");
+  const cards = page.locator("ul > li");
   await expect(cards.first()).toBeVisible();
-  await expect(page.locator(".badge")).toHaveCount(await cards.count());
+  await expect(cards).toHaveCount(2);
 });
