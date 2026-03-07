@@ -39,7 +39,7 @@ Sandboxd 解决的是单机 homelab 场景下的“把杂乱的 service、sandbo
 
 - 读取系统级 systemd manager 中的全部 units，并在 WebUI 展示。
 - 定义并展示统一的 `ManagedEntity` 视图。
-- 创建和管理由 Sandboxd 托管的普通 sandboxed service / scope。
+- 创建和管理由 Sandboxd 托管的普通 sandboxed service。
 - 对 Sandboxd 托管对象附加基础资源控制与安全沙箱配置。
 - 通过 WebUI、CLI、MCP 暴露一致的动作语义：`list`、`inspect`、`start`、`stop`、`restart`、`create sandboxed service`。
 
@@ -140,7 +140,7 @@ export interface CreateSandboxServiceInput {
 | 类别              | systemd 背书                       | V1 状态 | WebUI 表现                                            |
 | ----------------- | ---------------------------------- | ------- | ----------------------------------------------------- |
 | `systemd-unit`    | 宿主机已有 unit                    | 已实现  | 普通 unit，显示 `external` 或 `sandboxd-managed` 标签 |
-| `sandbox-service` | `service` / `scope` + 专用 `slice` | 已实现  | 特殊高亮，显示资源与沙箱信息                          |
+| `sandbox-service` | `service` + 专用 `slice`           | 已实现  | 特殊高亮，显示资源与沙箱信息                          |
 | `container`       | 未来映射到 unit-backed container   | 预留    | 特殊图标和分类                                        |
 | `vm`              | 未来映射到 wrapped QEMU unit       | 预留    | 特殊图标和分类                                        |
 
@@ -190,9 +190,11 @@ flowchart LR
 ### systemd 绑定策略
 
 - 持久化对象优先使用真实 unit file。
-- 瞬时对象可使用 transient unit / scope。
+- 瞬时对象未来如有需要可使用 transient unit，但这应保持为实现细节。
 - 项目托管对象的 ownership 元数据优先贴在 systemd unit / drop-in 中的 `X-Sandboxd` 段。
 - unit 的真实状态、依赖关系、启动顺序和故障语义一律以 systemd 为源。
+
+V1 不把 `scope` 暴露成用户可直接操作的对象类型。`scope` 通常不是用户直接使用的持久化管理单元，也不一定长期存在；如果后续内部实现需要借助它，也应该保持对用户透明。
 
 V1 不承诺数据库，也不承诺自定义 agent runtime。所有复杂度都优先压进 systemd 原语和少量附加元数据。
 
@@ -365,7 +367,7 @@ POST /mcp
 场景二：创建一个受限 service
 
 - 用户通过 CLI 或 WebUI 创建一个新的项目托管 service。
-- 该对象最终以 `service` 或 `scope` 形式存在，并挂到专用 `slice` 下。
+- 该对象最终以 `service` 形式存在，并挂到专用 `slice` 下。
 - 常见 V1 约束包括 `CPUWeight=`、`MemoryMax=`、`NoNewPrivileges=`、`PrivateTmp=`、`ProtectSystem=` 等。
 
 场景三：未来 container / VM 的展示方式
@@ -385,7 +387,7 @@ POST /mcp
 
 ### Phase 2: Sandboxed Service
 
-- 支持创建、更新、删除项目托管的 `service` / `scope`。
+- 支持创建、更新、删除项目托管的 `service`。
 - 支持基础资源控制：CPU、内存、slice 归属。
 - 支持基础安全沙箱：文件系统隔离、权限收缩、临时目录隔离。
 - 在 WebUI 中展示 profile 与实际 unit 配置的映射关系。

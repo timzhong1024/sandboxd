@@ -158,6 +158,8 @@ Sandboxd 是一个 systemd-first 的 homelab sandbox manager。
 
 V1 真正实现的只有前两类。`container` 和 `vm` 现在只是保留枚举，不要假装已经支持。
 
+当前不要把 `scope` 当成用户可直接操作的对象。它通常不是用户直接管理的持久化单元，如果未来内部实现需要用到 `scope`，也应保持为对用户透明的实现细节。
+
 ## 当前技术约束
 
 - 包管理器固定为 `pnpm`
