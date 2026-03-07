@@ -1,10 +1,12 @@
 import type {
+  AdvancedProperties,
   CreateSandboxServiceInput,
   DangerousAdoptManagedEntityInput,
   ManagedEntityDetail,
   ManagedEntitySummary,
   ResourceControls,
   Sandboxing,
+  UnknownSystemdDirective,
 } from "@sandboxd/core";
 
 export const managedEntityFixtureNames = ["mixed", "external-only", "empty"] as const;
@@ -12,7 +14,9 @@ export const managedEntityFixtureNames = ["mixed", "external-only", "empty"] as 
 export type ManagedEntityFixtureName = (typeof managedEntityFixtureNames)[number];
 
 export interface ManagedEntityMetadataRecord {
+  advancedProperties?: AdvancedProperties;
   description?: string;
+  unknownSystemdDirectives?: UnknownSystemdDirective[];
   resourceControls: ResourceControls;
   sandboxProfile?: string;
   sandboxing: Sandboxing;

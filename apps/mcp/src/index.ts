@@ -2,6 +2,9 @@ import { type ControlPlane } from "@sandboxd/control-plane";
 import {
   createSandboxServiceInputSchema,
   dangerousAdoptManagedEntityInputSchema,
+  getSupportedAdvancedPropertySpec,
+  supportedAdvancedPropertyKeySchema,
+  supportedAdvancedPropertySpecs,
 } from "@sandboxd/core";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
@@ -21,6 +24,26 @@ export function createSandboxdMcpServer(context: SandboxdMcpContext) {
     name: "sandboxd-mcp",
     version: "0.1.0",
   });
+
+  server.registerTool(
+    "list_supported_systemd_properties",
+    {
+      description:
+        "List the first-batch advanced systemd properties exposed by sandboxd for structured editing.",
+    },
+    async () => createJsonToolResult(supportedAdvancedPropertySpecs),
+  );
+
+  server.registerTool(
+    "describe_systemd_property",
+    {
+      description: "Describe one advanced systemd property supported by sandboxd.",
+      inputSchema: {
+        key: supportedAdvancedPropertyKeySchema,
+      },
+    },
+    async ({ key }) => createJsonToolResult(getSupportedAdvancedPropertySpec(key)),
+  );
 
   server.registerTool(
     "list",
