@@ -1,20 +1,20 @@
 {
-  "name": "@sandboxd/server",
+  "name": "@sandboxd/cli",
   "version": "0.1.0",
   "private": true,
+  "bin": {
+    "sandboxctl": "./dist/cli.js"
+  },
   "type": "module",
   "scripts": {
     "build": "vite build",
-    "dev": "vite-node src/index.ts",
+    "dev": "vite build --watch",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.27.1",
     "@sandboxd/control-plane": "workspace:*",
-    "@sandboxd/core": "workspace:*",
-    "@sandboxd/mcp": "workspace:*",
-    "zod": "^4.3.6"
+    "@sandboxd/core": "workspace:*"
   }
 }

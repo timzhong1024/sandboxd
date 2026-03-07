@@ -6,10 +6,5 @@
     "types": ["node", "vitest/globals"],
     "noEmit": true
   },
-  "include": [
-    "src",
-    "../../packages/core/src",
-    "../../packages/control-plane/src",
-    "../../apps/mcp/src"
-  ]
+  "include": ["src", "../../packages/core/src", "../../packages/control-plane/src"]
 }

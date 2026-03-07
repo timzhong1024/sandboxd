@@ -9,7 +9,6 @@ export default defineConfig({
         import.meta.dirname,
         "../../packages/control-plane/src/index.ts",
       ),
-      "@sandboxd/mcp": resolve(import.meta.dirname, "../mcp/src/index.ts"),
     },
   },
   build: {
@@ -19,7 +18,7 @@ export default defineConfig({
     target: "node24",
     rollupOptions: {
       output: {
-        entryFileNames: "server.js",
+        entryFileNames: "index.js",
       },
     },
   },

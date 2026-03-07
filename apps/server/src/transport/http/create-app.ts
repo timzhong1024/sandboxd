@@ -9,12 +9,10 @@ import {
   type ManagedEntitySummary,
 } from "@sandboxd/core";
 import { ZodError } from "zod";
-import {
-  ManagedEntityConflictError,
-  ManagedEntityNotFoundError,
-} from "../../use-cases/managed-entity-errors";
+import { ManagedEntityConflictError, ManagedEntityNotFoundError } from "@sandboxd/control-plane";
 
 interface CreateAppOptions {
+  handleMcpRequest?: (request: IncomingMessage, response: ServerResponse) => Promise<boolean>;
   listManagedEntities: () => Promise<ManagedEntitySummary[]>;
   inspectManagedEntity: (unitName: string) => Promise<ManagedEntityDetail>;
   startManagedEntity: (unitName: string) => Promise<ManagedEntityDetail>;
@@ -24,6 +22,7 @@ interface CreateAppOptions {
 }
 
 export function createApp({
+  handleMcpRequest,
   listManagedEntities,
   inspectManagedEntity,
   startManagedEntity,
@@ -39,6 +38,12 @@ export function createApp({
       }
 
       const url = new URL(request.url ?? "/", "http://localhost");
+
+      if (url.pathname === "/mcp" && handleMcpRequest) {
+        if (await handleMcpRequest(request, response)) {
+          return;
+        }
+      }
 
       if (request.method === "GET" && url.pathname === "/api/entities") {
         sendJson(response, 200, parseManagedEntitySummaries(await listManagedEntities()));
