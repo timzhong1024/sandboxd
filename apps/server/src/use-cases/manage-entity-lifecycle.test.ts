@@ -39,7 +39,9 @@ function createMetadataSource(): ManagedEntityMetadataSourcePort {
     createFallbackSandboxService: vi.fn(),
     updateFallbackEntityState: vi
       .fn()
-      .mockImplementation(async (_unitName: string, state: string) => createEntityDetail("lab-api.service", state)),
+      .mockImplementation(async (_unitName: string, state: string) =>
+        createEntityDetail("lab-api.service", state),
+      ),
   };
 }
 
