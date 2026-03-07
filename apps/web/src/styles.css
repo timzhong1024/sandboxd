@@ -1,0 +1,110 @@
+:root {
+  color: #eff1eb;
+  background:
+    radial-gradient(circle at top, rgba(188, 255, 113, 0.18), transparent 35%),
+    linear-gradient(180deg, #0d1516, #0b0f10 70%);
+  font-family: "Iosevka Aile", "IBM Plex Sans", sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+}
+
+.app-shell {
+  min-height: 100vh;
+  padding: 48px 20px 64px;
+}
+
+.hero,
+.panel {
+  margin: 0 auto;
+  max-width: 960px;
+}
+
+.hero {
+  margin-bottom: 32px;
+}
+
+.eyebrow {
+  margin: 0 0 12px;
+  color: #b6ff5f;
+  font-size: 0.8rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.hero h1 {
+  margin: 0;
+  font-size: clamp(2.2rem, 7vw, 4.5rem);
+  line-height: 0.95;
+}
+
+.subtitle {
+  max-width: 48rem;
+  color: #b8c3c5;
+}
+
+.panel {
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 24px;
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(18px);
+  padding: 24px;
+}
+
+.panel-header,
+.entity-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+}
+
+.entity-list {
+  display: grid;
+  gap: 12px;
+  padding: 0;
+  list-style: none;
+}
+
+.entity-card {
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.04);
+  padding: 16px;
+}
+
+.badge,
+.managed,
+.external {
+  border-radius: 999px;
+  padding: 6px 10px;
+  font-size: 0.82rem;
+}
+
+.badge {
+  background: rgba(182, 255, 95, 0.16);
+  color: #d8ffad;
+}
+
+.managed {
+  color: #d8ffad;
+  background: rgba(182, 255, 95, 0.14);
+}
+
+.external {
+  color: #c0d0ff;
+  background: rgba(128, 157, 255, 0.16);
+}
+
+@media (max-width: 640px) {
+  .panel-header,
+  .entity-row {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
