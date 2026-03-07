@@ -1,5 +1,6 @@
 import { once } from "node:events";
 import { afterEach, expect, test, vi } from "vitest";
+import { ManagedEntityConflictError } from "../../use-cases/managed-entity-errors";
 import { createApp } from "./create-app";
 
 const servers = new Set<ReturnType<typeof createApp>>();
@@ -139,4 +140,37 @@ test("returns healthz status", async () => {
 
   expect(response.ok).toBe(true);
   await expect(response.json()).resolves.toEqual({ status: "ok" });
+});
+
+test("returns a conflict status for unsupported actions", async () => {
+  const server = createApp({
+    listManagedEntities: vi.fn().mockResolvedValue([createEntityDetail()]),
+    inspectManagedEntity: vi.fn().mockResolvedValue(createEntityDetail()),
+    startManagedEntity: vi
+      .fn()
+      .mockRejectedValue(new ManagedEntityConflictError("Managed entity cannot be started")),
+    stopManagedEntity: vi.fn().mockResolvedValue(createEntityDetail()),
+    restartManagedEntity: vi.fn().mockResolvedValue(createEntityDetail()),
+    createSandboxService: vi.fn().mockResolvedValue(createEntityDetail("lab-worker.service")),
+  });
+  servers.add(server);
+  server.listen(0, "127.0.0.1");
+  await once(server, "listening");
+
+  const address = server.address();
+  if (!address || typeof address === "string") {
+    throw new TypeError("Expected an ephemeral TCP port");
+  }
+
+  const response = await fetch(
+    `http://127.0.0.1:${address.port}/api/entities/lab-api.service/start`,
+    {
+      method: "POST",
+    },
+  );
+
+  expect(response.status).toBe(409);
+  await expect(response.json()).resolves.toMatchObject({
+    error: expect.stringContaining("cannot be started"),
+  });
 });

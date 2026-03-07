@@ -1,7 +1,9 @@
 import { expect, test } from "vitest";
 import {
+  getUnitFilePath,
   parseSystemctlListUnitsOutput,
   parseSystemctlShowOutput,
+  renderSandboxServiceUnitFile,
   shouldUseFixture,
 } from "./systemctl-runtime";
 
@@ -72,4 +74,35 @@ test("parses systemctl show output into a detail record", () => {
       protectHome: false,
     },
   });
+});
+
+test("renders a managed sandbox service unit file", () => {
+  expect(
+    renderSandboxServiceUnitFile("lab-api.service", {
+      name: "lab-api",
+      execStart: "/usr/bin/node server.js",
+      sandboxProfile: "strict",
+      workingDirectory: "/srv/lab",
+      resourceControls: {
+        cpuWeight: "200",
+      },
+    }),
+  ).toContain("NoNewPrivileges=yes");
+  expect(
+    renderSandboxServiceUnitFile("lab-api.service", {
+      name: "lab-api",
+      execStart: "/usr/bin/node server.js",
+      sandboxProfile: "strict",
+      workingDirectory: "/srv/lab",
+      resourceControls: {
+        cpuWeight: "200",
+      },
+    }),
+  ).toContain("WorkingDirectory=/srv/lab");
+});
+
+test("uses the configured unit directory path", () => {
+  expect(getUnitFilePath("lab-api.service", { SANDBOXD_SYSTEMD_UNIT_DIR: "/tmp/systemd" })).toBe(
+    "/tmp/systemd/lab-api.service",
+  );
 });

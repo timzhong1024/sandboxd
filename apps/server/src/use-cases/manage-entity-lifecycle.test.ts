@@ -1,6 +1,7 @@
 import { expect, test, vi } from "vitest";
 import type { ManagedEntityMetadataSourcePort } from "../ports/managed-entity-metadata-source-port";
 import type { SystemdRuntimePort } from "../ports/systemd-runtime-port";
+import { ManagedEntityConflictError } from "./managed-entity-errors";
 import { createRestartManagedEntity } from "./restart-managed-entity";
 import { createStartManagedEntity } from "./start-managed-entity";
 import { createStopManagedEntity } from "./stop-managed-entity";
@@ -34,8 +35,18 @@ function createEntityDetail(unitName = "lab-api.service", state = "active") {
 
 function createMetadataSource(): ManagedEntityMetadataSourcePort {
   return {
+    deleteManagedEntityMetadata: vi.fn(),
     listFallbackEntitySummaries: vi.fn().mockResolvedValue([]),
+    listManagedEntityMetadata: vi.fn().mockResolvedValue([]),
+    getManagedEntityMetadata: vi.fn().mockResolvedValue({
+      unitName: "lab-api.service",
+      sandboxProfile: "strict",
+      resourceControls: {},
+      sandboxing: {},
+      slice: "sandboxd.slice",
+    }),
     getFallbackEntityDetail: vi.fn().mockResolvedValue(createEntityDetail()),
+    saveManagedEntityMetadata: vi.fn(),
     createFallbackSandboxService: vi.fn(),
     updateFallbackEntityState: vi
       .fn()
@@ -47,6 +58,7 @@ function createMetadataSource(): ManagedEntityMetadataSourcePort {
 
 function createRuntime(overrides: Partial<SystemdRuntimePort>): SystemdRuntimePort {
   return {
+    createSandboxService: vi.fn().mockResolvedValue(undefined),
     listUnits: vi.fn().mockResolvedValue([]),
     getUnit: vi.fn().mockResolvedValue({
       unitName: "lab-api.service",
@@ -64,7 +76,21 @@ function createRuntime(overrides: Partial<SystemdRuntimePort>): SystemdRuntimePo
 
 test("start falls back to metadata when runtime is unavailable", async () => {
   const metadataSource = createMetadataSource();
+  vi.mocked(metadataSource.getManagedEntityMetadata).mockResolvedValue({
+    unitName: "lab-api.service",
+    sandboxProfile: "strict",
+    resourceControls: {},
+    sandboxing: {},
+    slice: "sandboxd.slice",
+  });
   const runtime = createRuntime({
+    getUnit: vi.fn().mockResolvedValue({
+      unitName: "lab-api.service",
+      loadState: "loaded",
+      activeState: "inactive",
+      subState: "dead",
+      description: "Sandboxd managed lab API",
+    }),
     startUnit: vi
       .fn()
       .mockRejectedValue(new Error("systemctl runtime disabled while fixture mode is enabled")),
@@ -88,6 +114,13 @@ test("start surfaces runtime action failures instead of mutating fixture state",
   const metadataSource = createMetadataSource();
   const runtimeError = new Error("Failed to start lab-api.service");
   const runtime = createRuntime({
+    getUnit: vi.fn().mockResolvedValue({
+      unitName: "lab-api.service",
+      loadState: "loaded",
+      activeState: "inactive",
+      subState: "dead",
+      description: "Sandboxd managed lab API",
+    }),
     startUnit: vi.fn().mockRejectedValue(runtimeError),
   });
 
@@ -140,4 +173,28 @@ test("restart falls back to metadata when runtime is unavailable", async () => {
     "lab-api.service",
     "active",
   );
+});
+
+test("rejects actions for non-managed entities", async () => {
+  const metadataSource = createMetadataSource();
+  vi.mocked(metadataSource.getManagedEntityMetadata).mockResolvedValue(null);
+  const runtime = createRuntime({
+    getUnit: vi.fn().mockResolvedValue({
+      unitName: "docker.service",
+      loadState: "loaded",
+      activeState: "active",
+      subState: "running",
+      description: "Docker Application Container Engine",
+    }),
+  });
+
+  const stopManagedEntity = createStopManagedEntity({
+    metadataSource,
+    systemdRuntime: runtime,
+  });
+
+  await expect(stopManagedEntity("docker.service")).rejects.toBeInstanceOf(
+    ManagedEntityConflictError,
+  );
+  expect(runtime.stopUnit).not.toHaveBeenCalled();
 });

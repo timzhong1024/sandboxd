@@ -9,6 +9,10 @@ import {
   type ManagedEntitySummary,
 } from "@sandboxd/core";
 import { ZodError } from "zod";
+import {
+  ManagedEntityConflictError,
+  ManagedEntityNotFoundError,
+} from "../../use-cases/managed-entity-errors";
 
 interface CreateAppOptions {
   listManagedEntities: () => Promise<ManagedEntitySummary[]>;
@@ -82,7 +86,12 @@ export function createApp({
         return;
       }
 
-      if (error instanceof Error && /not found/i.test(error.message)) {
+      if (error instanceof ManagedEntityConflictError) {
+        sendJson(response, 409, { error: error.message });
+        return;
+      }
+
+      if (error instanceof ManagedEntityNotFoundError) {
         sendJson(response, 404, { error: error.message });
         return;
       }

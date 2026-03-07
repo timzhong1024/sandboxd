@@ -79,10 +79,54 @@ test("surfaces API failures", async () => {
     vi.fn().mockResolvedValue({
       ok: false,
       status: 503,
+      json: async () => ({
+        error: "backend unavailable",
+      }),
     }),
   );
 
   const client = createManagedEntitiesHttpClient();
 
-  await expect(client.loadManagedEntities()).rejects.toThrow(/503/);
+  await expect(client.loadManagedEntities()).rejects.toThrow(/backend unavailable/);
+});
+
+test("creates sandbox services through the API", async () => {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        kind: "sandbox-service",
+        origin: "sandboxd",
+        unitName: "lab-api.service",
+        unitType: "service",
+        state: "inactive",
+        labels: {},
+        capabilities: {
+          canInspect: true,
+          canStart: true,
+          canStop: false,
+          canRestart: false,
+        },
+        resourceControls: {},
+        sandboxing: {},
+        status: {
+          activeState: "inactive",
+          subState: "dead",
+          loadState: "loaded",
+        },
+      }),
+    }),
+  );
+
+  const client = createManagedEntitiesHttpClient();
+
+  await expect(
+    client.createSandboxService({
+      name: "lab-api",
+      execStart: "/usr/bin/node server.js",
+    }),
+  ).resolves.toMatchObject({
+    unitName: "lab-api.service",
+  });
 });
