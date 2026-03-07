@@ -1,17 +1,17 @@
 ---
 name: dev-task-loop
-description: End-to-end software development workflow from requirement intake through implementation, local verification, GitHub pull request creation, and pull request follow-up. Use when Codex is asked to take a coding task to closure, including clarifying scope, inspecting the codebase, making changes, running local tests or checks, opening a branch and PR, monitoring reviews/checks, responding to PR feedback, or summarizing blockers when GitHub access or validation fails.
+description: End-to-end software development workflow from requirement intake through implementation, local verification, GitHub pull request creation, and pull request follow-up. Use only when the user explicitly asks for a closed-loop development task such as “闭环开发任务”, “从需求做到提 PR”, “做到 PR 为止”, or explicitly mentions $dev-task-loop / this skill. In that case, Codex should continue autonomously through scope clarification, implementation, local checks, branch and PR creation, and PR status follow-up until the PR is opened or a concrete blocker prevents further progress.
 ---
 
 # Dev Task Loop
 
 ## Overview
 
-使用这个 skill 时，把任务当成一个必须闭环的工程交付，而不是只产出代码片段。目标是把“需求 -> 改动 -> 本地验证 -> GitHub PR -> PR 跟进”串成一条连续流水线，并在任一环节受阻时明确报告阻塞点。
+只有在用户明确要求“闭环开发任务”，或者明确点名 `$dev-task-loop` / 这个 skill 时才使用它。使用这个 skill 时，把任务当成一个必须闭环的工程交付，而不是只产出代码片段；默认持续推进“需求 -> 改动 -> 本地验证 -> GitHub PR -> PR 跟进”，直到 PR 已提出，或者出现明确阻塞点。
 
 ## Execution Checklist
 
-按下面顺序执行；除非用户明确只要某一段，否则不要停在中间。
+按下面顺序执行；除非用户明确只要某一段，否则不要停在中间。默认目标不是“完成代码修改”，而是“完成到 PR 已提出”为止。
 
 ### 1. Clarify Scope
 
@@ -338,6 +338,8 @@ gh run view <run-id> --job <job-id> --log-failed
 - 不要伪造 GitHub 状态、检查结果或 review 结论；要么实际查询，要么明确说未查询。
 - 不要为了“看起来闭环”跳过本地验证或 PR 描述。
 - 用户只要求其中一段流程时，只执行那一段，但在结尾指出剩余未闭环环节。
+- 一旦这个 skill 被触发，默认持续执行直到 PR 已创建；只有在用户显式叫停，或者遇到真实阻塞时才停止。
+- 真实阻塞只包括：权限不足、未登录 GitHub、远端不可达、仓库保护规则拦截、缺少必要环境、需求存在无法安全假设的关键歧义。
 - 查询 PR / CI 时优先用 `gh`，因为它能直接给出 PR、check、run、review 的结构化结果。
 - 如果没有 `gh`、没有登录态或没有仓库权限，立刻说明阻塞，不要假装完成了 GitHub 跟进。
 
@@ -355,6 +357,8 @@ gh run view <run-id> --job <job-id> --log-failed
 
 以下请求都应触发这个 skill：
 
+- “这是一个闭环开发任务，做到提 PR 为止。”
+- “用 $dev-task-loop 处理这个需求。”
 - “把这个需求直接做完，测完后提个 GitHub PR。”
 - “修这个 bug，跑本地测试，然后开 PR。”
 - “跟进一下这个 PR，看看 review 和 CI 还差什么。”
