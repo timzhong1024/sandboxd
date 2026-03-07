@@ -1,19 +1,19 @@
-import type { ManagedEntity } from "@sandboxd/core";
+import type { ManagedEntitySummary } from "@sandboxd/core";
 import { useEffect, useState } from "react";
 
 interface UseManagedEntitiesViewModelOptions {
-  loadManagedEntities: () => Promise<ManagedEntity[]>;
+  loadManagedEntities: () => Promise<ManagedEntitySummary[]>;
 }
 
 interface ManagedEntitiesViewModel {
-  entities: ManagedEntity[];
+  entities: ManagedEntitySummary[];
   error: string | null;
 }
 
 export function useManagedEntitiesViewModel({
   loadManagedEntities,
 }: UseManagedEntitiesViewModelOptions): ManagedEntitiesViewModel {
-  const [entities, setEntities] = useState<ManagedEntity[]>([]);
+  const [entities, setEntities] = useState<ManagedEntitySummary[]>([]);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {

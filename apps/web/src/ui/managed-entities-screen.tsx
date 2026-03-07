@@ -1,4 +1,4 @@
-import type { ManagedEntity } from "@sandboxd/core";
+import type { ManagedEntitySummary } from "@sandboxd/core";
 import { isSandboxdManaged } from "@sandboxd/core";
 import { Activity, DatabaseZap, Layers2, ScanSearch } from "lucide-react";
 import type { ReactNode } from "react";
@@ -20,7 +20,7 @@ import {
 } from "./dashboard-primitives";
 
 interface ManagedEntitiesScreenProps {
-  entities: ManagedEntity[];
+  entities: ManagedEntitySummary[];
   error: string | null;
 }
 
@@ -42,7 +42,7 @@ function getStateTone(state: string): EntityBadgeState {
   return "unknown";
 }
 
-function getEntityIcon(kind: ManagedEntity["kind"]) {
+function getEntityIcon(kind: ManagedEntitySummary["kind"]) {
   if (kind === "sandbox-service") {
     return Layers2;
   }
@@ -201,7 +201,7 @@ function DesignNote({ icon, title, body }: { icon: ReactNode; title: string; bod
   );
 }
 
-function EntityCard({ entity }: { entity: ManagedEntity }) {
+function EntityCard({ entity }: { entity: ManagedEntitySummary }) {
   const Icon = getEntityIcon(entity.kind);
   const managed = isSandboxdManaged(entity);
 

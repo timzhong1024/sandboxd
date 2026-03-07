@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import type { SystemdUnitRecord } from "@sandboxd/core";
+import type { Sandboxing, SystemdUnitDetailRecord, SystemdUnitRecord } from "@sandboxd/core";
 import type { SystemdRuntimePort } from "../../ports/systemd-runtime-port";
 
 const listUnitsArgs = ["list-units", "--all", "--plain", "--no-legend", "--no-pager"];
@@ -7,18 +7,43 @@ const listUnitsArgs = ["list-units", "--all", "--plain", "--no-legend", "--no-pa
 export function createSystemctlRuntime(): SystemdRuntimePort {
   return {
     async listUnits() {
-      if (shouldUseFixture()) {
-        throw new Error("systemctl runtime disabled while fixture mode is enabled");
-      }
-
-      if (process.platform !== "linux") {
-        throw new Error("systemctl runtime is only available on Linux");
-      }
-
+      ensureSystemctlAvailable();
       const stdout = await runSystemctl(listUnitsArgs);
       return parseSystemctlListUnitsOutput(stdout);
     },
+    async getUnit(unitName) {
+      ensureSystemctlAvailable();
+      const stdout = await runSystemctl([
+        "show",
+        unitName,
+        "--property=Id,Description,LoadState,ActiveState,SubState,Slice,FragmentPath,UnitFileState,CPUWeight,MemoryMax,TasksMax,NoNewPrivileges,PrivateTmp,ProtectSystem,ProtectHome",
+      ]);
+
+      return parseSystemctlShowOutput(stdout);
+    },
+    async startUnit(unitName) {
+      ensureSystemctlAvailable();
+      await runSystemctl(["start", unitName]);
+    },
+    async stopUnit(unitName) {
+      ensureSystemctlAvailable();
+      await runSystemctl(["stop", unitName]);
+    },
+    async restartUnit(unitName) {
+      ensureSystemctlAvailable();
+      await runSystemctl(["restart", unitName]);
+    },
   };
+}
+
+function ensureSystemctlAvailable() {
+  if (shouldUseFixture()) {
+    throw new Error("systemctl runtime disabled while fixture mode is enabled");
+  }
+
+  if (process.platform !== "linux") {
+    throw new Error("systemctl runtime is only available on Linux");
+  }
 }
 
 export function shouldUseFixture(environment: NodeJS.ProcessEnv = process.env) {
@@ -53,6 +78,71 @@ export function parseSystemctlListUnitsOutput(stdout: string): SystemdUnitRecord
       };
     })
     .filter((record): record is SystemdUnitRecord => record !== null);
+}
+
+export function parseSystemctlShowOutput(stdout: string): SystemdUnitDetailRecord | null {
+  const values = new Map<string, string>();
+
+  for (const line of stdout.split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed) {
+      continue;
+    }
+
+    const separatorIndex = trimmed.indexOf("=");
+    if (separatorIndex === -1) {
+      continue;
+    }
+
+    values.set(trimmed.slice(0, separatorIndex), trimmed.slice(separatorIndex + 1));
+  }
+
+  const unitName = values.get("Id");
+  if (!unitName) {
+    return null;
+  }
+
+  return {
+    unitName,
+    description: values.get("Description") ?? "",
+    loadState: values.get("LoadState") ?? "unknown",
+    activeState: values.get("ActiveState") ?? "unknown",
+    subState: values.get("SubState") ?? "unknown",
+    slice: values.get("Slice") || undefined,
+    fragmentPath: values.get("FragmentPath") || undefined,
+    unitFileState: values.get("UnitFileState") || undefined,
+    resourceControls: {
+      cpuWeight: values.get("CPUWeight") || undefined,
+      memoryMax: values.get("MemoryMax") || undefined,
+      tasksMax: values.get("TasksMax") || undefined,
+    },
+    sandboxing: parseSandboxing(values),
+  };
+}
+
+function parseSandboxing(values: Map<string, string>): Sandboxing {
+  return {
+    noNewPrivileges: parseBooleanProperty(values.get("NoNewPrivileges")),
+    privateTmp: parseBooleanProperty(values.get("PrivateTmp")),
+    protectSystem: values.get("ProtectSystem") || undefined,
+    protectHome: parseBooleanProperty(values.get("ProtectHome")),
+  };
+}
+
+function parseBooleanProperty(value: string | undefined) {
+  if (!value) {
+    return undefined;
+  }
+
+  if (value === "yes" || value === "true") {
+    return true;
+  }
+
+  if (value === "no" || value === "false") {
+    return false;
+  }
+
+  return undefined;
 }
 
 function runSystemctl(args: string[]) {

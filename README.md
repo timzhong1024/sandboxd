@@ -59,34 +59,81 @@ Sandboxd 解决的是单机 homelab 场景下的“把杂乱的 service、sandbo
 
 ## 核心实体模型
 
-Sandboxd 不把“unit、container、VM”拆成互不相干的三套对象，而是统一抽象为一个 `ManagedEntity`。
+Sandboxd 仍然围绕统一的 `ManagedEntity` 语义工作，但 V1 的接口契约已经拆成 3 组，而不是继续用一个过胖的对象同时承载列表、详情和创建入参。
 
 ```ts
 export type ManagedEntityKind = "systemd-unit" | "sandbox-service" | "container" | "vm";
 
 export type ManagedEntityOrigin = "external" | "sandboxd";
 
-export interface ManagedEntity {
+export interface ManagedEntitySummary {
   kind: ManagedEntityKind;
   origin: ManagedEntityOrigin;
   unitName: string;
-  unitType: "service" | "scope" | "slice" | "socket" | "target" | "timer" | string;
+  unitType: string;
   state: string;
+  subState?: string;
+  loadState?: string;
   slice?: string;
-  labels: Record<string, string>;
+  description?: string;
   sandboxProfile?: string;
+  labels: Record<string, string>;
+  capabilities: {
+    canInspect: boolean;
+    canStart: boolean;
+    canStop: boolean;
+    canRestart: boolean;
+  };
+}
+
+export interface ManagedEntityDetail extends ManagedEntitySummary {
+  resourceControls: {
+    cpuWeight?: string;
+    memoryMax?: string;
+    tasksMax?: string;
+  };
+  sandboxing: {
+    noNewPrivileges?: boolean;
+    privateTmp?: boolean;
+    protectSystem?: string;
+    protectHome?: boolean;
+  };
+  status: {
+    activeState: string;
+    subState: string;
+    loadState: string;
+  };
+}
+
+export interface CreateSandboxServiceInput {
+  name: string;
+  execStart: string;
+  description?: string;
+  workingDirectory?: string;
+  environment?: Record<string, string>;
+  slice?: string;
+  sandboxProfile?: string;
+  resourceControls?: {
+    cpuWeight?: string;
+    memoryMax?: string;
+    tasksMax?: string;
+  };
+  sandboxing?: {
+    noNewPrivileges?: boolean;
+    privateTmp?: boolean;
+    protectSystem?: string;
+    protectHome?: boolean;
+  };
 }
 ```
 
 字段约定：
 
-- `kind`：对象类别。V1 实现 `systemd-unit` 与 `sandbox-service`，`container` / `vm` 作为保留枚举提前写入模型。
-- `origin`：对象来源。`external` 表示系统已有 unit，`sandboxd` 表示由 Sandboxd 创建或接管展示元数据的对象。
-- `unitName`：最终受 systemd 管理的 unit 名称。
-- `unitType`：systemd 原生 unit 类型，避免在 UI 上把 systemd 语义抹平。
-- `slice`：对象归属的 slice。V1 的项目托管对象默认落在专用 `slice` 中，例如 `sandboxd.slice` 或其子 slice。
-- `labels`：Sandboxd 自己维护的展示和归类元数据。
-- `sandboxProfile`：逻辑上的安全模板名，用于映射到具体 systemd sandbox / resource-control 选项。
+- `ManagedEntitySummary` 用于列表页、概览卡片、批量刷新。
+- `ManagedEntityDetail` 用于详情页、动作返回值、创建成功后的对象快照。
+- `CreateSandboxServiceInput` 用于 WebUI、CLI、MCP 统一的创建入参。
+- `capabilities` 是前端动作可用性的来源，不让 WebUI 自己重新推断。
+- `resourceControls` 和 `sandboxing` 是 V1 详情接口必须稳定返回的配置面。
 
 分类规则：
 
@@ -147,6 +194,59 @@ flowchart LR
 
 V1 不承诺数据库，也不承诺自定义 agent runtime。所有复杂度都优先压进 systemd 原语和少量附加元数据。
 
+### runtime-systemd 演进策略
+
+当前 runtime adapter 仍然允许使用 `systemctl`，但长期方向不是继续围绕 stdout 文本做复杂解析，而是把读路径逐步迁到更结构化的 systemd 接口。
+
+默认演进路径：
+
+1. 稳定 `SystemdRuntimePort`
+2. 保持上层 use-case / transport 不感知底层实现
+3. 短期用 `systemctl`
+4. 中期做 D-Bus adapter spike
+5. 验证稳定后再切换默认读路径
+
+建议中的 runtime 分层：
+
+```mermaid
+flowchart LR
+  A["web / cli / mcp"] --> B["server use-cases"]
+  B --> C["SystemdRuntimePort"]
+
+  C --> D["systemctl runtime (current)"]
+  C --> E["dbus runtime (future)"]
+
+  D --> D1["list-units stdout parser"]
+  D --> D2["systemctl show"]
+  D --> D3["systemctl start/stop/restart"]
+
+  E --> E1["Manager.ListUnits"]
+  E --> E2["GetUnit + Properties.GetAll"]
+  E --> E3["StartUnit/StopUnit/RestartUnit"]
+```
+
+当前默认策略：
+
+- `list` 可以暂时继续使用 `systemctl list-units`
+- `inspect` 应优先往 `systemctl show` 的结构化属性读取收敛
+- `start` / `stop` / `restart` 可以继续通过 `systemctl` 执行
+- 不要继续扩大“整行 stdout 正则解析”承担的职责范围
+
+关于 `dbus-next`：
+
+- 可以作为 Node 侧 D-Bus adapter 的候选实现
+- 现阶段不把“迁移到 dbus-next”本身当作里程碑
+- 优先迁移的是 runtime 边界，而不是先绑定到某个具体库
+
+推荐的实施顺序：
+
+1. 先让 `systemctl` adapter 内部稳定产出统一的 `SystemdUnitRecord` / `SystemdUnitDetailRecord`
+2. 再增加一个并行的 D-Bus adapter，只先覆盖 `getUnit()`
+3. D-Bus 详情读取稳定后，再扩到 `listUnits()`
+4. 最后再评估是否把动作接口也切到 D-Bus method call
+
+这个顺序的目标是降低风险：先用 D-Bus 解决最适合结构化读取的 `inspect`，而不是一开始就全面替换现有 runtime。
+
 ### 当前代码分层
 
 为了降低技术债并提高 AI 并行开发效率，当前代码默认按以下方向拆分：
@@ -178,7 +278,7 @@ V1 不承诺数据库，也不承诺自定义 agent runtime。所有复杂度都
 
 ### WebUI
 
-首版 WebUI 聚焦只读 inventory 和最小写操作：
+首版 WebUI 聚焦 inventory 和最小写操作：
 
 - 列出全部 systemd units。
 - 按 `external` / `sandboxd-managed` / 未来 `container` / `vm` 分类展示。
@@ -213,6 +313,26 @@ MCP 的职责是让 agent 在“受管对象”这个抽象层上工作，而不
 - `create_sandboxed_service`
 
 未来如果扩展 container / VM，MCP 也复用同一 `ManagedEntity` 模型，而不是新增一套旁路工具。
+
+### HTTP API
+
+V1 统一对外 HTTP 接口约定如下：
+
+```http
+GET  /api/entities
+GET  /api/entities/:unitName
+POST /api/entities/:unitName/start
+POST /api/entities/:unitName/stop
+POST /api/entities/:unitName/restart
+POST /api/sandbox-services
+```
+
+返回约定：
+
+- `GET /api/entities` 返回 `ManagedEntitySummary[]`
+- `GET /api/entities/:unitName` 返回 `ManagedEntityDetail`
+- 三个动作接口返回动作后的 `ManagedEntityDetail`
+- `POST /api/sandbox-services` 接收 `CreateSandboxServiceInput` 并返回新建对象的 `ManagedEntityDetail`
 
 ### 典型场景
 
@@ -261,8 +381,8 @@ MCP 的职责是让 agent 在“受管对象”这个抽象层上工作，而不
 当前仓库已经初始化为一个 `pnpm` monorepo，并先落地 3 个包：
 
 - `apps/web`：React + Vite 的 WebUI 骨架。
-- `apps/server`：Node.js 控制面骨架，提供健康检查和示例实体接口。
-- `packages/core`：共享实体模型和基础领域工具。
+- `apps/server`：Node.js 控制面骨架，已经对齐 V1 HTTP 接口面。
+- `packages/core`：共享实体模型、summary/detail 契约和 payload 校验。
 
 暂未创建独立包，但已在架构上保留的位置：
 
@@ -270,7 +390,7 @@ MCP 的职责是让 agent 在“受管对象”这个抽象层上工作，而不
 - `mcp`
 - `runtime-systemd`
 
-当前这批骨架代码的目的不是实现完整功能，而是先打通 `web <- server <- core` 的类型与运行链路，让后续迭代能够直接围绕真实工作区展开。
+当前这批代码已经把 V1 的接口定义落到 `core <- server <- web` 三层，但不等于 V1 行为已经全部完成。尤其是创建 sandboxed service 仍然是 placeholder 级别实现，真实 systemd 写路径还需要继续补齐。
 
 `apps/server` 现在会优先尝试读取真实 systemd unit inventory；如果运行环境不是 Linux，或者 `systemctl` 不可用 / 不可访问，则会自动退回 fixture inventory，保证本地开发、测试和 CI 仍然可运行。
 
@@ -322,7 +442,7 @@ pnpm test
 - `pnpm verify` 是提交前的全量回路，会顺序执行 `format:check`、`lint`、`typecheck`、`test`、`test:e2e`、`build`
 - CI 使用 GitHub Actions Ubuntu runner 预装的 Google Chrome，不再单独下载 Playwright Chromium
 
-另外，`ManagedEntity` 的运行时 payload 校验保留在 `@sandboxd/core`，而 fixture/fallback 场景现在归 `apps/server` 的 metadata adapter 管理，避免把测试数据污染到 domain 包。首次在本机运行 Playwright 前需要先安装一次 Chromium。
+另外，运行时 payload 校验保留在 `@sandboxd/core`，而 fixture/fallback 场景归 `apps/server` 的 metadata adapter 管理，避免把测试数据污染到 domain 包。首次在本机运行 Playwright 前需要先安装一次 Chromium。
 
 ## 参考资料
 

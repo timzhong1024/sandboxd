@@ -1,4 +1,4 @@
-import type { ManagedEntity } from "@sandboxd/core";
+import type { ManagedEntitySummary } from "@sandboxd/core";
 import type { ManagedEntitiesClientPort } from "../ports/managed-entities-client-port";
 
 interface CreateLoadManagedEntitiesOptions {
@@ -6,7 +6,7 @@ interface CreateLoadManagedEntitiesOptions {
 }
 
 export function createLoadManagedEntities({ client }: CreateLoadManagedEntitiesOptions) {
-  return async function loadManagedEntities(): Promise<ManagedEntity[]> {
+  return async function loadManagedEntities(): Promise<ManagedEntitySummary[]> {
     return client.loadManagedEntities();
   };
 }

@@ -1,27 +1,51 @@
 import { expect, test } from "vitest";
 import {
+  getManagedEntityCapabilities,
   getUnitType,
   isSandboxdManaged,
+  mapSystemdUnitDetailRecord,
   mapSystemdUnitRecord,
-  parseManagedEntities,
-  type ManagedEntity,
+  parseCreateSandboxServiceInput,
+  parseManagedEntityDetail,
+  parseManagedEntitySummaries,
+  type ManagedEntitySummary,
 } from "./index";
 
 test("identifies sandboxd-managed entities", () => {
-  const entity: ManagedEntity = {
+  const entity: ManagedEntitySummary = {
     kind: "sandbox-service",
     origin: "sandboxd",
     unitName: "lab-api.service",
     unitType: "service",
     state: "active",
     labels: {},
+    capabilities: {
+      canInspect: true,
+      canStart: false,
+      canStop: true,
+      canRestart: true,
+    },
   };
 
   expect(isSandboxdManaged(entity)).toBe(true);
 });
 
-test("parses a valid managed entity payload", () => {
-  const entities = parseManagedEntities([
+test("derives capabilities from origin and state", () => {
+  expect(
+    getManagedEntityCapabilities({
+      origin: "sandboxd",
+      state: "active",
+    }),
+  ).toEqual({
+    canInspect: true,
+    canStart: false,
+    canStop: true,
+    canRestart: true,
+  });
+});
+
+test("parses valid managed entity summaries", () => {
+  const entities = parseManagedEntitySummaries([
     {
       kind: "systemd-unit",
       origin: "external",
@@ -29,34 +53,68 @@ test("parses a valid managed entity payload", () => {
       unitType: "service",
       state: "active",
       labels: {},
-    },
-    {
-      kind: "sandbox-service",
-      origin: "sandboxd",
-      unitName: "lab-api.service",
-      unitType: "service",
-      state: "active",
-      labels: {},
+      capabilities: {
+        canInspect: true,
+        canStart: false,
+        canStop: false,
+        canRestart: false,
+      },
     },
   ]);
 
-  expect(entities).toHaveLength(2);
-  expect(entities[1]).toMatchObject({ unitName: "lab-api.service" });
+  expect(entities).toHaveLength(1);
+  expect(entities[0]).toMatchObject({ unitName: "docker.service" });
 });
 
-test("rejects an invalid managed entity payload", () => {
-  expect(() => parseManagedEntities([{ unitName: "broken.service", labels: {} }])).toThrow(
+test("parses a valid managed entity detail payload", () => {
+  const entity = parseManagedEntityDetail({
+    kind: "sandbox-service",
+    origin: "sandboxd",
+    unitName: "lab-api.service",
+    unitType: "service",
+    state: "active",
+    labels: {},
+    capabilities: {
+      canInspect: true,
+      canStart: false,
+      canStop: true,
+      canRestart: true,
+    },
+    resourceControls: {},
+    sandboxing: {},
+    status: {
+      activeState: "active",
+      subState: "running",
+      loadState: "loaded",
+    },
+  });
+
+  expect(entity.status.subState).toBe("running");
+});
+
+test("parses a valid create sandbox service input payload", () => {
+  const input = parseCreateSandboxServiceInput({
+    name: "lab-api",
+    execStart: "/usr/bin/node server.js",
+  });
+
+  expect(input.name).toBe("lab-api");
+});
+
+test("rejects an invalid managed entity summary payload", () => {
+  expect(() => parseManagedEntitySummaries([{ unitName: "broken.service", labels: {} }])).toThrow(
     /"kind"/i,
   );
 });
 
-test("maps a systemd unit record into the shared entity model", () => {
+test("maps a systemd unit record into the shared summary model", () => {
   const entity = mapSystemdUnitRecord({
     unitName: "docker.service",
     loadState: "loaded",
     activeState: "active",
     subState: "running",
     description: "Docker Application Container Engine",
+    slice: "system.slice",
   });
 
   expect(entity).toMatchObject({
@@ -65,25 +123,32 @@ test("maps a systemd unit record into the shared entity model", () => {
     unitName: "docker.service",
     unitType: "service",
     state: "active",
-    labels: {
-      description: "Docker Application Container Engine",
-      loadState: "loaded",
-      subState: "running",
-    },
+    subState: "running",
+    loadState: "loaded",
+    slice: "system.slice",
+    description: "Docker Application Container Engine",
   });
 });
 
-test("derives sandbox-service when the unit looks sandboxd-owned", () => {
-  const entity = mapSystemdUnitRecord({
+test("maps a systemd unit detail record into the shared detail model", () => {
+  const entity = mapSystemdUnitDetailRecord({
     unitName: "lab-api.service",
     loadState: "loaded",
     activeState: "active",
     subState: "running",
     description: "Sandboxd managed lab API",
+    slice: "sandboxd.slice",
+    resourceControls: {
+      cpuWeight: "200",
+    },
+    sandboxing: {
+      noNewPrivileges: true,
+    },
   });
 
   expect(entity.kind).toBe("sandbox-service");
-  expect(entity.origin).toBe("sandboxd");
+  expect(entity.resourceControls.cpuWeight).toBe("200");
+  expect(entity.sandboxing.noNewPrivileges).toBe(true);
 });
 
 test("extracts a unit type suffix from the unit name", () => {
