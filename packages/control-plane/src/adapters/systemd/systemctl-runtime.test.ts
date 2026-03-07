@@ -101,6 +101,24 @@ test("renders a managed sandbox service unit file", () => {
   ).toContain("WorkingDirectory=/srv/lab");
 });
 
+test("renders advanced NoNewPrivileges and empty raw fallback directives", () => {
+  const rendered = renderSandboxServiceUnitFile("lab-api.service", {
+    name: "lab-api",
+    execStart: "/usr/bin/node server.js",
+    advancedProperties: {
+      NoNewPrivileges: {
+        parsed: false,
+      },
+      ProtectSystem: {
+        raw: "",
+      },
+    },
+  });
+
+  expect(rendered).toContain("NoNewPrivileges=no");
+  expect(rendered).toContain("ProtectSystem=");
+});
+
 test("uses the configured unit directory path", () => {
   expect(getUnitFilePath("lab-api.service", { SANDBOXD_SYSTEMD_UNIT_DIR: "/tmp/systemd" })).toBe(
     "/tmp/systemd/lab-api.service",

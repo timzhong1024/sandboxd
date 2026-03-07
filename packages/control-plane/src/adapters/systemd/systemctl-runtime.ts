@@ -235,6 +235,11 @@ function renderAdvancedPropertyLines(advancedProperties: AdvancedProperties | un
     ),
     renderParsedOrRawDirective("PrivateTmp", advancedProperties.PrivateTmp, renderBooleanEnumValue),
     renderParsedOrRawDirective(
+      "NoNewPrivileges",
+      advancedProperties.NoNewPrivileges,
+      renderBooleanValue,
+    ),
+    renderParsedOrRawDirective(
       "PrivateDevices",
       advancedProperties.PrivateDevices,
       renderBooleanValue,
@@ -305,7 +310,7 @@ function renderParsedOrRawDirective<T extends { parsed?: unknown; raw?: string }
     return `${key}=${renderParsed(value.parsed as Exclude<T["parsed"], undefined>)}`;
   }
 
-  if (value.raw) {
+  if (value.raw !== undefined) {
     return `${key}=${value.raw}`;
   }
 

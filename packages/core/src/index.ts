@@ -96,7 +96,7 @@ export const supportedAdvancedPropertyKeySchema = z.enum([
   "Environment",
 ]);
 
-export const rawDirectiveValueSchema = z.string().min(1);
+export const rawDirectiveValueSchema = z.string();
 export const rawDirectiveValuesSchema = z.array(rawDirectiveValueSchema).min(1);
 
 function createParsedRawPropertySchema<T extends z.ZodTypeAny>(parsedSchema: T) {
@@ -659,6 +659,12 @@ function parseCpuWeightDirective(value: string): { parsed?: CpuWeightValue; raw?
       parsed: {
         kind: "idle",
       },
+    };
+  }
+
+  if (!/^\d+$/.test(trimmed)) {
+    return {
+      raw: value,
     };
   }
 

@@ -328,9 +328,45 @@ test("falls back to raw when a known property value cannot be safely structured"
   expect(
     parseAdvancedPropertyDirective("SystemCallFilter", "@system-service ~@privileged"),
   ).toEqual([{ raw: "@system-service ~@privileged" }]);
+  expect(parseAdvancedPropertyDirective("CPUWeight", "200foo")).toEqual({
+    raw: "200foo",
+  });
   expect(parseAdvancedPropertyDirective("Environment", 'BROKEN "unterminated')).toEqual([
     { raw: 'BROKEN "unterminated' },
   ]);
+});
+
+test("accepts empty raw fallback values for known properties", () => {
+  const entity = parseManagedEntityDetail({
+    kind: "sandbox-service",
+    origin: "sandboxd",
+    unitName: "lab-api.service",
+    unitType: "service",
+    state: "inactive",
+    labels: {},
+    capabilities: {
+      canInspect: true,
+      canStart: true,
+      canStop: false,
+      canRestart: false,
+    },
+    resourceControls: {},
+    sandboxing: {},
+    advancedProperties: {
+      ProtectSystem: {
+        raw: "",
+      },
+    },
+    status: {
+      activeState: "inactive",
+      subState: "dead",
+      loadState: "loaded",
+    },
+  });
+
+  expect(entity.advancedProperties?.ProtectSystem).toEqual({
+    raw: "",
+  });
 });
 
 test("parses a valid create sandbox service input payload", () => {
