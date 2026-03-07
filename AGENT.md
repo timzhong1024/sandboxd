@@ -153,6 +153,8 @@ Sandboxd 是一个 systemd-first 的 homelab sandbox manager。
 
 - `resourceControls`
 - `sandboxing`
+- `advancedProperties`
+- `unknownSystemdDirectives`
 - `status`
 
 `kind` 取值固定为：
@@ -165,6 +167,15 @@ Sandboxd 是一个 systemd-first 的 homelab sandbox manager。
 V1 真正实现的只有前两类。`container` 和 `vm` 现在只是保留枚举，不要假装已经支持。
 
 当前不要把 `scope` 当成用户可直接操作的对象。它通常不是用户直接管理的持久化单元，如果未来内部实现需要用到 `scope`，也应保持为对用户透明的实现细节。
+
+V2 高级模式的当前默认约束：
+
+- 不做“原始 unit 文件编辑器”，而是做结构化高级模式
+- 第一批支持的原生属性已经在 `packages/core` 注册表中固化
+- Web / MCP / 后续 CLI 帮助都应复用同一份 property registry，不要各自维护属性说明
+- 已支持的原生属性走 `advancedProperties`
+- unit / drop-in 中检测到但当前未支持结构化编辑的 `Service` 指令，走 `unknownSystemdDirectives`
+- 未知属性不能静默丢失；至少要在 inspect 结果中保留并在 UI 中明确展示为“已检测到但暂不支持”
 
 ## 当前技术约束
 

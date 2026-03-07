@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, expect, test } from "vitest";
@@ -53,5 +53,90 @@ test("dangerously adopts an existing unit through a sandboxd drop-in", async () 
   await expect(source.getManagedEntityMetadata("docker.service")).resolves.toMatchObject({
     unitName: "docker.service",
     sandboxProfile: "baseline",
+  });
+});
+
+test("parses supported advanced properties and preserves unknown directives", async () => {
+  const rootDir = await mkdtemp(join(tmpdir(), "sandboxd-metadata-"));
+  tempDirs.push(rootDir);
+  const source = createFilesystemMetadataSource({ rootDir });
+
+  await writeFile(
+    join(rootDir, "lab-api.service"),
+    [
+      "[Unit]",
+      "Description=Sandboxd managed lab API",
+      "",
+      "[Service]",
+      "ExecStart=/usr/bin/node server.js",
+      "ProtectSystem=yes",
+      "PrivateTmp=disconnected",
+      "ReadOnlyPaths=/usr /etc",
+      "PrivateDevices=yes",
+      "SystemCallFilter=@system-service ~@privileged",
+      "RestrictNamespaces=yes",
+      'Environment=NODE_ENV=production "GREETING=hello world"',
+      'Environment=BAD_TOKEN "unterminated',
+      "IPAddressDeny=any",
+      "",
+    ].join("\n"),
+  );
+  await mkdir(join(rootDir, "lab-api.service.d"), { recursive: true });
+  await writeFile(
+    join(rootDir, "lab-api.service.d", "90-sandboxd-owned.conf"),
+    ["[X-Sandboxd]", "Owned=yes", "Profile=strict", ""].join("\n"),
+  );
+
+  await expect(source.getManagedEntityMetadata("lab-api.service")).resolves.toMatchObject({
+    unitName: "lab-api.service",
+    sandboxProfile: "strict",
+    advancedProperties: {
+      ProtectSystem: {
+        parsed: true,
+      },
+      PrivateTmp: {
+        parsed: "disconnected",
+      },
+      ReadOnlyPaths: [
+        {
+          parsed: ["/usr", "/etc"],
+        },
+      ],
+      PrivateDevices: {
+        parsed: true,
+      },
+      SystemCallFilter: [
+        {
+          raw: "@system-service ~@privileged",
+        },
+      ],
+      RestrictNamespaces: [
+        {
+          parsed: {
+            mode: "boolean",
+            value: true,
+          },
+        },
+      ],
+      Environment: [
+        {
+          parsed: {
+            NODE_ENV: "production",
+            GREETING: "hello world",
+          },
+        },
+        {
+          raw: 'BAD_TOKEN "unterminated',
+        },
+      ],
+    },
+    unknownSystemdDirectives: [
+      {
+        section: "Service",
+        key: "IPAddressDeny",
+        value: "any",
+        source: "unit-file",
+      },
+    ],
   });
 });

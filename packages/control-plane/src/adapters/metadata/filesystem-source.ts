@@ -1,6 +1,20 @@
 import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import type { CreateSandboxServiceInput, DangerousAdoptManagedEntityInput } from "@sandboxd/core";
+import type {
+  AdvancedBooleanListMode,
+  AdvancedListMode,
+  AdvancedProperties,
+  CreateSandboxServiceInput,
+  DangerousAdoptManagedEntityInput,
+  SupportedAdvancedPropertyKey,
+  UnknownSystemdDirective,
+} from "@sandboxd/core";
+import {
+  advancedPropertiesSchema,
+  parseAdvancedPropertyDirective,
+  supportedAdvancedPropertyKeys,
+  unknownSystemdDirectiveSchema,
+} from "@sandboxd/core";
 import { z } from "zod";
 import type {
   ManagedEntityMetadataRecord,
@@ -9,10 +23,22 @@ import type {
 
 const managedSectionName = "X-Sandboxd";
 const adoptDropInFileName = "90-sandboxd-owned.conf";
+const serviceSectionName = "Service";
+const ignoredKnownDirectiveKeys = new Set([
+  "Description",
+  "ExecStart",
+  "ExecStartPre",
+  "ExecStartPost",
+  "Type",
+  "Slice",
+  "WantedBy",
+]);
 
 const sandboxdMetadataSchema = z.object({
   owned: z.boolean().optional(),
   sandboxProfile: z.string().optional(),
+  advancedProperties: advancedPropertiesSchema.optional(),
+  unknownSystemdDirectives: z.array(unknownSystemdDirectiveSchema).optional(),
 });
 
 interface CreateFilesystemMetadataSourceOptions {
@@ -37,6 +63,8 @@ export function createFilesystemMetadataSource(
     }
 
     return createMetadataRecord({
+      advancedProperties: metadata.advancedProperties,
+      unknownSystemdDirectives: metadata.unknownSystemdDirectives,
       unitName,
       sandboxProfile: metadata.sandboxProfile,
     });
@@ -115,37 +143,60 @@ async function listCandidateUnitNames(rootDir: string) {
 }
 
 function createMetadataRecord(record: {
+  advancedProperties?: AdvancedProperties;
   sandboxProfile: string | undefined;
+  unknownSystemdDirectives?: UnknownSystemdDirective[];
   unitName: string;
 }): ManagedEntityMetadataRecord {
   return {
     unitName: record.unitName,
     resourceControls: {},
     sandboxing: {},
+    ...(record.advancedProperties ? { advancedProperties: record.advancedProperties } : {}),
+    ...(record.unknownSystemdDirectives
+      ? { unknownSystemdDirectives: record.unknownSystemdDirectives }
+      : {}),
     ...(record.sandboxProfile ? { sandboxProfile: record.sandboxProfile } : {}),
   };
 }
 
 async function readSandboxdMetadata(rootDir: string, unitName: string) {
-  const texts = await Promise.all(
-    [getManagedUnitFilePath(rootDir, unitName), ...(await listDropInFiles(rootDir, unitName))].map(
-      (path) => readTextIfPresent(path),
-    ),
-  );
+  const sources = [
+    { path: getManagedUnitFilePath(rootDir, unitName), source: "unit-file" as const },
+    ...((await listDropInFiles(rootDir, unitName)).map((path) => ({
+      path,
+      source: "drop-in" as const,
+    })) ?? []),
+  ];
+  const parsedFiles = (
+    await Promise.all(
+      sources.map(async ({ path, source }) => {
+        const text = await readTextIfPresent(path);
+        if (!text) {
+          return null;
+        }
 
-  const merged = texts.reduce<Record<string, string>>((result, text) => {
-    if (!text) {
-      return result;
-    }
+        return parseSystemdConfigText(text, source);
+      }),
+    )
+  ).filter((record): record is ParsedSystemdConfigFile => Boolean(record));
 
+  const merged = parsedFiles.reduce<Record<string, string>>((result, file) => {
     return {
       ...result,
-      ...parseSandboxdDirectiveMap(text),
+      ...file.sandboxdDirectives,
     };
   }, {});
+  const advancedProperties = parsedFiles.reduce<AdvancedProperties>(
+    (result, file) => mergeAdvancedProperties(result, file.advancedProperties),
+    {},
+  );
+  const unknownSystemdDirectives = parsedFiles.flatMap((file) => file.unknownSystemdDirectives);
 
   return sandboxdMetadataSchema.parse({
     owned: parseBooleanValue(merged.Owned ?? merged["X-Sandboxd-Owned"]),
+    advancedProperties,
+    unknownSystemdDirectives,
     sandboxProfile: merged.Profile ?? merged["X-Sandboxd-Profile"],
   });
 }
@@ -201,8 +252,19 @@ function renderSandboxdDropIn(input: DangerousAdoptManagedEntityInput) {
     .join("\n");
 }
 
-function parseSandboxdDirectiveMap(text: string) {
-  const values: Record<string, string> = {};
+interface ParsedSystemdConfigFile {
+  advancedProperties: AdvancedProperties;
+  sandboxdDirectives: Record<string, string>;
+  unknownSystemdDirectives: UnknownSystemdDirective[];
+}
+
+function parseSystemdConfigText(
+  text: string,
+  source: UnknownSystemdDirective["source"],
+): ParsedSystemdConfigFile {
+  const sandboxdDirectives: Record<string, string> = {};
+  const advancedProperties: AdvancedProperties = {};
+  const unknownSystemdDirectives: UnknownSystemdDirective[] = [];
   let currentSection = "";
 
   for (const rawLine of text.split("\n")) {
@@ -225,11 +287,144 @@ function parseSandboxdDirectiveMap(text: string) {
     const value = line.slice(separatorIndex + 1).trim();
 
     if (currentSection === managedSectionName || key.startsWith("X-Sandboxd-")) {
-      values[key] = value;
+      sandboxdDirectives[key] = value;
+      continue;
+    }
+
+    if (currentSection !== serviceSectionName) {
+      continue;
+    }
+
+    const nextAdvancedProperty = parseSupportedAdvancedProperty(key, value);
+    if (nextAdvancedProperty) {
+      Object.assign(
+        advancedProperties,
+        mergeAdvancedProperties(advancedProperties, nextAdvancedProperty),
+      );
+      continue;
+    }
+
+    if (!ignoredKnownDirectiveKeys.has(key)) {
+      unknownSystemdDirectives.push({
+        section: currentSection,
+        key,
+        value,
+        source,
+      });
     }
   }
 
-  return values;
+  return {
+    sandboxdDirectives,
+    advancedProperties,
+    unknownSystemdDirectives,
+  };
+}
+
+function parseSupportedAdvancedProperty(key: string, value: string): AdvancedProperties | null {
+  if (!supportedAdvancedPropertyKeys.includes(key as SupportedAdvancedPropertyKey)) {
+    return null;
+  }
+
+  const supportedKey = key as SupportedAdvancedPropertyKey;
+  return {
+    [supportedKey]: parseAdvancedPropertyDirective(supportedKey, value),
+  } as AdvancedProperties;
+}
+
+function mergeAdvancedProperties(
+  left: AdvancedProperties,
+  right: AdvancedProperties,
+): AdvancedProperties {
+  const merged: AdvancedProperties = {};
+  const next = merged as Record<
+    SupportedAdvancedPropertyKey,
+    AdvancedProperties[SupportedAdvancedPropertyKey] | undefined
+  >;
+
+  for (const key of supportedAdvancedPropertyKeys) {
+    const value = mergeAdvancedPropertyValue(key, left[key], right[key]);
+    if (value !== undefined) {
+      next[key] = value;
+    }
+  }
+
+  return merged;
+}
+
+function mergeAdvancedPropertyValue(
+  key: SupportedAdvancedPropertyKey,
+  left: AdvancedProperties[SupportedAdvancedPropertyKey] | undefined,
+  right: AdvancedProperties[SupportedAdvancedPropertyKey] | undefined,
+): AdvancedProperties[SupportedAdvancedPropertyKey] | undefined {
+  if (!left) {
+    return right;
+  }
+
+  if (!right) {
+    return left;
+  }
+
+  if (key === "Environment") {
+    return [
+      ...(left as NonNullable<AdvancedProperties["Environment"]>),
+      ...(right as NonNullable<AdvancedProperties["Environment"]>),
+    ] as AdvancedProperties[SupportedAdvancedPropertyKey];
+  }
+
+  if (key === "ReadOnlyPaths" || key === "ReadWritePaths" || key === "InaccessiblePaths") {
+    return [
+      ...(left as Array<{ parsed?: string[]; raw?: string }>),
+      ...(right as Array<{ parsed?: string[]; raw?: string }>),
+    ] as AdvancedProperties[SupportedAdvancedPropertyKey];
+  }
+
+  if (
+    key === "CapabilityBoundingSet" ||
+    key === "SystemCallFilter" ||
+    key === "RestrictAddressFamilies"
+  ) {
+    return [
+      ...(left as Array<{ parsed?: AdvancedListMode; raw?: string }>),
+      ...(right as Array<{ parsed?: AdvancedListMode; raw?: string }>),
+    ] as AdvancedProperties[SupportedAdvancedPropertyKey];
+  }
+
+  if (key === "RestrictNamespaces") {
+    return [
+      ...(left as Array<{ parsed?: AdvancedBooleanListMode; raw?: string }>),
+      ...(right as Array<{ parsed?: AdvancedBooleanListMode; raw?: string }>),
+    ] as AdvancedProperties[SupportedAdvancedPropertyKey];
+  }
+
+  return mergeOverrideProperty(
+    left as { parsed?: unknown; raw?: string },
+    right as {
+      parsed?: unknown;
+      raw?: string;
+    },
+  ) as AdvancedProperties[SupportedAdvancedPropertyKey];
+}
+
+function mergeOverrideProperty<T extends { parsed?: unknown; raw?: string }>(left: T, right: T): T {
+  return compactParsedRawProperty({
+    parsed: right.parsed ?? left.parsed,
+    raw: right.raw ?? left.raw,
+  }) as T;
+}
+
+function compactParsedRawProperty<T extends { parsed?: unknown; raw?: string }>(value: T): T {
+  const next = {} as T;
+
+  if (value.parsed !== undefined) {
+    next.parsed = value.parsed;
+  }
+
+  if (value.raw) {
+    next.raw = value.raw;
+  }
+
+  return next;
 }
 
 function parseBooleanValue(value: string | undefined) {

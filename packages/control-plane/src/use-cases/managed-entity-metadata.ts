@@ -47,6 +47,11 @@ export function mergeDetailWithMetadata(
       ...detail.sandboxing,
       ...metadata.sandboxing,
     },
+    advancedProperties: {
+      ...detail.advancedProperties,
+      ...metadata.advancedProperties,
+    },
+    unknownSystemdDirectives: metadata.unknownSystemdDirectives ?? detail.unknownSystemdDirectives,
     status: detail.status,
   };
 }

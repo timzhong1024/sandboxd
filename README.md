@@ -396,7 +396,37 @@ POST /mcp
 - 支持创建、更新、删除项目托管的 `service`。
 - 支持基础资源控制：CPU、内存、slice 归属。
 - 支持基础安全沙箱：文件系统隔离、权限收缩、临时目录隔离。
+- 增加“高级模式”，以结构化交互方式暴露第一批原生 systemd sandbox 属性，而不是直接退化成 ini 编辑器。
 - 在 WebUI 中展示 profile 与实际 unit 配置的映射关系。
+
+第二阶段的高级模式当前先收敛一条约束：只支持一批高价值、可校验、可解释、可做表单交互的原生属性。首批清单已经在 `packages/core` 注册表里固化，包括：
+
+- `ProtectSystem`
+- `ProtectHome`
+- `PrivateTmp`
+- `ReadOnlyPaths`
+- `ReadWritePaths`
+- `InaccessiblePaths`
+- `NoNewPrivileges`
+- `CapabilityBoundingSet`
+- `PrivateDevices`
+- `PrivateUsers`
+- `PrivateNetwork`
+- `RestrictNamespaces`
+- `SystemCallFilter`
+- `RestrictAddressFamilies`
+- `CPUWeight`
+- `MemoryMax`
+- `TasksMax`
+- `WorkingDirectory`
+- `Environment`
+
+未知属性兜底策略也同时固定：
+
+- 已支持属性走结构化字段 `advancedProperties`
+- 未支持但在 unit / drop-in 中检测到的原生 `Service` 指令，保存在 `unknownSystemdDirectives`
+- WebUI 后续应把这类字段标成“检测到但当前不支持结构化编辑”，而不是静默丢弃
+- MCP 不直接内嵌整份 systemd 文档，而是按需提供属性目录和单项说明
 
 ### Phase 3: Container and VM
 

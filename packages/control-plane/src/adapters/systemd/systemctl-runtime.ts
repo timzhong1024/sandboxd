@@ -2,8 +2,14 @@ import { spawn } from "node:child_process";
 import { mkdir, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import type {
+  AdvancedBooleanListMode,
+  AdvancedListMode,
+  AdvancedProperties,
+  CountLimitValue,
   CreateSandboxServiceInput,
+  CpuWeightValue,
   Sandboxing,
+  SizeLimitValue,
   SystemdUnitDetailRecord,
   SystemdUnitRecord,
 } from "@sandboxd/core";
@@ -159,6 +165,7 @@ export function renderSandboxServiceUnitFile(
     renderEnvironmentLines(input.environment),
     renderResourceControlLines(input.resourceControls),
     renderSandboxingLines(resolveSandboxingDefaults(input)),
+    renderAdvancedPropertyLines(input.advancedProperties),
     "",
     "[Install]",
     "WantedBy=multi-user.target",
@@ -208,6 +215,204 @@ function renderSandboxingLines(sandboxing: Sandboxing) {
       ? `ProtectHome=${sandboxing.protectHome ? "yes" : "no"}`
       : null,
   ].filter((line): line is string => Boolean(line));
+}
+
+function renderAdvancedPropertyLines(advancedProperties: AdvancedProperties | undefined) {
+  if (!advancedProperties) {
+    return [];
+  }
+
+  return [
+    renderParsedOrRawDirective(
+      "ProtectSystem",
+      advancedProperties.ProtectSystem,
+      renderBooleanEnumValue,
+    ),
+    renderParsedOrRawDirective(
+      "ProtectHome",
+      advancedProperties.ProtectHome,
+      renderBooleanEnumValue,
+    ),
+    renderParsedOrRawDirective("PrivateTmp", advancedProperties.PrivateTmp, renderBooleanEnumValue),
+    renderParsedOrRawDirective(
+      "PrivateDevices",
+      advancedProperties.PrivateDevices,
+      renderBooleanValue,
+    ),
+    renderParsedOrRawDirective("PrivateUsers", advancedProperties.PrivateUsers, renderBooleanValue),
+    renderParsedOrRawDirective(
+      "PrivateNetwork",
+      advancedProperties.PrivateNetwork,
+      renderBooleanValue,
+    ),
+    renderRepeatedParsedOrRawDirective(
+      "ReadOnlyPaths",
+      advancedProperties.ReadOnlyPaths,
+      renderStringListValue,
+    ),
+    renderRepeatedParsedOrRawDirective(
+      "ReadWritePaths",
+      advancedProperties.ReadWritePaths,
+      renderStringListValue,
+    ),
+    renderRepeatedParsedOrRawDirective(
+      "InaccessiblePaths",
+      advancedProperties.InaccessiblePaths,
+      renderStringListValue,
+    ),
+    renderRepeatedParsedOrRawDirective(
+      "CapabilityBoundingSet",
+      advancedProperties.CapabilityBoundingSet,
+      renderAdvancedListMode,
+    ),
+    renderRepeatedParsedOrRawDirective(
+      "RestrictNamespaces",
+      advancedProperties.RestrictNamespaces,
+      renderAdvancedBooleanListMode,
+    ),
+    renderRepeatedParsedOrRawDirective(
+      "SystemCallFilter",
+      advancedProperties.SystemCallFilter,
+      renderAdvancedListMode,
+    ),
+    renderRepeatedParsedOrRawDirective(
+      "RestrictAddressFamilies",
+      advancedProperties.RestrictAddressFamilies,
+      renderAdvancedListMode,
+    ),
+    renderParsedOrRawDirective("CPUWeight", advancedProperties.CPUWeight, renderCpuWeightValue),
+    renderParsedOrRawDirective("MemoryMax", advancedProperties.MemoryMax, renderSizeLimitValue),
+    renderParsedOrRawDirective("TasksMax", advancedProperties.TasksMax, renderCountLimitValue),
+    renderParsedOrRawDirective(
+      "WorkingDirectory",
+      advancedProperties.WorkingDirectory,
+      renderIdentityValue,
+    ),
+    renderEnvironmentProperty(advancedProperties.Environment),
+  ].filter((line): line is string => Boolean(line));
+}
+
+function renderParsedOrRawDirective<T extends { parsed?: unknown; raw?: string }>(
+  key: string,
+  value: T | undefined,
+  renderParsed: (parsed: Exclude<T["parsed"], undefined>) => string,
+) {
+  if (!value) {
+    return null;
+  }
+
+  if (value.parsed !== undefined) {
+    return `${key}=${renderParsed(value.parsed as Exclude<T["parsed"], undefined>)}`;
+  }
+
+  if (value.raw) {
+    return `${key}=${value.raw}`;
+  }
+
+  return null;
+}
+
+function renderRepeatedParsedOrRawDirective<T extends { parsed?: unknown; raw?: string }>(
+  key: string,
+  value: T[] | undefined,
+  renderParsed: (parsed: Exclude<T["parsed"], undefined>) => string,
+) {
+  if (!value || value.length === 0) {
+    return null;
+  }
+
+  return value
+    .map((entry) => renderParsedOrRawDirective(key, entry, renderParsed))
+    .filter((line): line is string => Boolean(line))
+    .join("\n");
+}
+
+function renderBooleanValue(value: boolean) {
+  return value ? "yes" : "no";
+}
+
+function renderBooleanEnumValue(value: boolean | string) {
+  if (typeof value === "boolean") {
+    return renderBooleanValue(value);
+  }
+
+  return value;
+}
+
+function renderStringListValue(values: string[]) {
+  return values.join(" ");
+}
+
+function renderAdvancedListMode(value: AdvancedListMode) {
+  if (value.mode === "reset") {
+    return "";
+  }
+
+  return value.mode === "deny" ? `~${value.values.join(" ")}` : value.values.join(" ");
+}
+
+function renderAdvancedBooleanListMode(value: AdvancedBooleanListMode) {
+  if (value.mode === "boolean") {
+    return renderBooleanValue(value.value);
+  }
+
+  return renderAdvancedListMode(value);
+}
+
+function renderCpuWeightValue(value: CpuWeightValue) {
+  if (value.kind === "idle") {
+    return "idle";
+  }
+
+  return String(value.value);
+}
+
+function renderSizeLimitValue(value: SizeLimitValue) {
+  switch (value.kind) {
+    case "infinity":
+      return "infinity";
+    case "percentage":
+      return `${value.value}%`;
+    case "size":
+      return value.value;
+  }
+}
+
+function renderCountLimitValue(value: CountLimitValue) {
+  switch (value.kind) {
+    case "infinity":
+      return "infinity";
+    case "percentage":
+      return `${value.value}%`;
+    case "count":
+      return String(value.value);
+  }
+}
+
+function renderIdentityValue(value: string) {
+  return escapeUnitValue(value);
+}
+
+function renderEnvironmentProperty(value: AdvancedProperties["Environment"] | undefined) {
+  if (!value || value.length === 0) {
+    return null;
+  }
+
+  return value
+    .flatMap((entry) => {
+      if (entry.parsed) {
+        return Object.entries(entry.parsed)
+          .sort(([left], [right]) => left.localeCompare(right))
+          .map(([key, item]) => `Environment=${key}=${escapeEnvironmentValue(item)}`);
+      }
+
+      if (entry.raw) {
+        return [`Environment=${entry.raw}`];
+      }
+
+      return [];
+    })
+    .join("\n");
 }
 
 function resolveSandboxingDefaults(input: CreateSandboxServiceInput): Sandboxing {
