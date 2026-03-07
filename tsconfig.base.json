@@ -16,7 +16,7 @@
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
     "paths": {
-      "@sandboxd/core": ["packages/core/src/index.ts"]
+      "@sandboxd/core": ["./packages/core/src/index.ts"]
     }
   }
 }
