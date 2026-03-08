@@ -17,7 +17,7 @@ test("renders the managed entity inventory", async ({ page }) => {
   await expect(page.getByText("lab-worker.service")).toBeVisible();
   await expect(page.getByText("lab-batch.service")).toBeVisible();
 
-  const cards = page.locator("ul > li");
+  const cards = page.getByRole("list").getByRole("listitem");
   await expect(cards.first()).toBeVisible();
   await expect(cards).toHaveCount(4);
 });
