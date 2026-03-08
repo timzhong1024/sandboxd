@@ -11,12 +11,14 @@ import { z } from "zod";
 
 export interface SandboxdMcpContext {
   createSandboxService: ControlPlane["createSandboxService"];
+  deleteSandboxService: ControlPlane["deleteSandboxService"];
   dangerouslyAdoptManagedEntity: ControlPlane["dangerouslyAdoptManagedEntity"];
   inspectManagedEntity: ControlPlane["inspectManagedEntity"];
   listManagedEntities: ControlPlane["listManagedEntities"];
   restartManagedEntity: ControlPlane["restartManagedEntity"];
   startManagedEntity: ControlPlane["startManagedEntity"];
   stopManagedEntity: ControlPlane["stopManagedEntity"];
+  updateSandboxService: ControlPlane["updateSandboxService"];
 }
 
 export function createSandboxdMcpServer(context: SandboxdMcpContext) {
@@ -117,6 +119,33 @@ export function createSandboxdMcpServer(context: SandboxdMcpContext) {
       inputSchema: createSandboxServiceInputSchema,
     },
     async (input) => createJsonToolResult(await context.createSandboxService(input)),
+  );
+
+  server.registerTool(
+    "update_sandboxed_service",
+    {
+      description: "Update an existing sandboxd-managed sandboxed service.",
+      inputSchema: {
+        unitName: z.string().min(1),
+        ...createSandboxServiceInputSchema.shape,
+      },
+    },
+    async ({ unitName, ...input }) =>
+      createJsonToolResult(await context.updateSandboxService(unitName, input)),
+  );
+
+  server.registerTool(
+    "delete_sandboxed_service",
+    {
+      description: "Delete an existing sandboxd-managed sandboxed service.",
+      inputSchema: {
+        unitName: z.string().min(1),
+      },
+    },
+    async ({ unitName }) => {
+      await context.deleteSandboxService(unitName);
+      return createJsonToolResult({ deleted: true, unitName });
+    },
   );
 
   return server;

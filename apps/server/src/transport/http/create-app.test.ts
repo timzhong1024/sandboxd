@@ -42,6 +42,8 @@ function createServerForTest() {
     restartManagedEntity: vi.fn().mockResolvedValue(createEntityDetail()),
     dangerouslyAdoptManagedEntity: vi.fn().mockResolvedValue(createEntityDetail("docker.service")),
     createSandboxService: vi.fn().mockResolvedValue(createEntityDetail("lab-worker.service")),
+    updateSandboxService: vi.fn().mockResolvedValue(createEntityDetail("lab-worker.service")),
+    deleteSandboxService: vi.fn().mockResolvedValue(undefined),
   });
 }
 
@@ -155,6 +157,56 @@ test("dangerously adopts existing services through the API", async () => {
   expect(await response.json()).toMatchObject({ unitName: "docker.service" });
 });
 
+test("updates sandbox services through the API", async () => {
+  const server = createServerForTest();
+  servers.add(server);
+  server.listen(0, "127.0.0.1");
+  await once(server, "listening");
+
+  const address = server.address();
+  if (!address || typeof address === "string") {
+    throw new TypeError("Expected an ephemeral TCP port");
+  }
+
+  const response = await fetch(
+    `http://127.0.0.1:${address.port}/api/sandbox-services/lab-worker.service`,
+    {
+      method: "PUT",
+      headers: {
+        "content-type": "application/json",
+      },
+      body: JSON.stringify({
+        name: "lab-worker",
+        execStart: "/usr/bin/python worker.py",
+      }),
+    },
+  );
+
+  expect(response.status).toBe(200);
+  expect(await response.json()).toMatchObject({ unitName: "lab-worker.service" });
+});
+
+test("deletes sandbox services through the API", async () => {
+  const server = createServerForTest();
+  servers.add(server);
+  server.listen(0, "127.0.0.1");
+  await once(server, "listening");
+
+  const address = server.address();
+  if (!address || typeof address === "string") {
+    throw new TypeError("Expected an ephemeral TCP port");
+  }
+
+  const response = await fetch(
+    `http://127.0.0.1:${address.port}/api/sandbox-services/lab-worker.service`,
+    {
+      method: "DELETE",
+    },
+  );
+
+  expect(response.status).toBe(204);
+});
+
 test("returns 400 for malformed JSON request bodies", async () => {
   const server = createServerForTest();
   servers.add(server);
@@ -209,6 +261,8 @@ test("returns a conflict status for unsupported actions", async () => {
     restartManagedEntity: vi.fn().mockResolvedValue(createEntityDetail()),
     dangerouslyAdoptManagedEntity: vi.fn().mockResolvedValue(createEntityDetail("docker.service")),
     createSandboxService: vi.fn().mockResolvedValue(createEntityDetail("lab-worker.service")),
+    updateSandboxService: vi.fn().mockResolvedValue(createEntityDetail("lab-worker.service")),
+    deleteSandboxService: vi.fn().mockResolvedValue(undefined),
   });
   servers.add(server);
   server.listen(0, "127.0.0.1");
@@ -247,6 +301,8 @@ test("delegates /mcp requests to the MCP handler", async () => {
     restartManagedEntity: vi.fn().mockResolvedValue(createEntityDetail()),
     dangerouslyAdoptManagedEntity: vi.fn().mockResolvedValue(createEntityDetail("docker.service")),
     createSandboxService: vi.fn().mockResolvedValue(createEntityDetail("lab-worker.service")),
+    updateSandboxService: vi.fn().mockResolvedValue(createEntityDetail("lab-worker.service")),
+    deleteSandboxService: vi.fn().mockResolvedValue(undefined),
   });
   servers.add(server);
   server.listen(0, "127.0.0.1");

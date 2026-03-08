@@ -1,17 +1,18 @@
 import { spawn } from "node:child_process";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import type {
-  AdvancedBooleanListMode,
-  AdvancedListMode,
-  AdvancedProperties,
-  CountLimitValue,
-  CreateSandboxServiceInput,
-  CpuWeightValue,
-  Sandboxing,
-  SizeLimitValue,
-  SystemdUnitDetailRecord,
-  SystemdUnitRecord,
+import {
+  getSandboxProfileDefaults,
+  type AdvancedBooleanListMode,
+  type AdvancedListMode,
+  type AdvancedProperties,
+  type CountLimitValue,
+  type CreateSandboxServiceInput,
+  type CpuWeightValue,
+  type Sandboxing,
+  type SizeLimitValue,
+  type SystemdUnitDetailRecord,
+  type SystemdUnitRecord,
 } from "@sandboxd/core";
 import type { SystemdRuntimePort } from "../../ports/systemd-runtime-port";
 
@@ -24,6 +25,18 @@ export function createSystemctlRuntime(): SystemdRuntimePort {
       const unitPath = getUnitFilePath(unitName);
       await mkdir(dirname(unitPath), { recursive: true });
       await writeFile(unitPath, renderSandboxServiceUnitFile(unitName, input), "utf8");
+      await runSystemctl(["daemon-reload"]);
+    },
+    async updateSandboxService(unitName, input) {
+      ensureSystemctlAvailable();
+      const unitPath = getUnitFilePath(unitName);
+      await mkdir(dirname(unitPath), { recursive: true });
+      await writeFile(unitPath, renderSandboxServiceUnitFile(unitName, input), "utf8");
+      await runSystemctl(["daemon-reload"]);
+    },
+    async deleteSandboxService(unitName) {
+      ensureSystemctlAvailable();
+      await rm(getUnitFilePath(unitName), { force: true });
       await runSystemctl(["daemon-reload"]);
     },
     async listUnits() {
@@ -427,28 +440,6 @@ function resolveSandboxingDefaults(input: CreateSandboxServiceInput): Sandboxing
     ...profileDefaults,
     ...input.sandboxing,
   };
-}
-
-function getSandboxProfileDefaults(profile: string | undefined): Sandboxing {
-  if (profile === "strict") {
-    return {
-      noNewPrivileges: true,
-      privateTmp: true,
-      protectSystem: "strict",
-      protectHome: true,
-    };
-  }
-
-  if (profile === "baseline") {
-    return {
-      noNewPrivileges: true,
-      privateTmp: true,
-      protectSystem: "full",
-      protectHome: false,
-    };
-  }
-
-  return {};
 }
 
 function escapeEnvironmentValue(value: string) {

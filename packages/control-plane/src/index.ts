@@ -4,11 +4,13 @@ import { createFixtureMetadataSource, parseFixtureName } from "./adapters/metada
 import { createSystemctlRuntime } from "./adapters/systemd/systemctl-runtime";
 import { createCreateSandboxService } from "./use-cases/create-sandbox-service";
 import { createDangerouslyAdoptManagedEntity } from "./use-cases/dangerously-adopt-managed-entity";
+import { createDeleteSandboxService } from "./use-cases/delete-sandbox-service";
 import { createInspectManagedEntity } from "./use-cases/inspect-managed-entity";
 import { createListManagedEntities } from "./use-cases/list-managed-entities";
 import { createRestartManagedEntity } from "./use-cases/restart-managed-entity";
 import { createStartManagedEntity } from "./use-cases/start-managed-entity";
 import { createStopManagedEntity } from "./use-cases/stop-managed-entity";
+import { createUpdateSandboxService } from "./use-cases/update-sandbox-service";
 
 export {
   ManagedEntityConflictError,
@@ -23,12 +25,14 @@ export type { SystemdRuntimePort } from "./ports/systemd-runtime-port";
 
 export interface ControlPlane {
   createSandboxService: ReturnType<typeof createCreateSandboxService>;
+  deleteSandboxService: ReturnType<typeof createDeleteSandboxService>;
   dangerouslyAdoptManagedEntity: ReturnType<typeof createDangerouslyAdoptManagedEntity>;
   inspectManagedEntity: ReturnType<typeof createInspectManagedEntity>;
   listManagedEntities: ReturnType<typeof createListManagedEntities>;
   restartManagedEntity: ReturnType<typeof createRestartManagedEntity>;
   startManagedEntity: ReturnType<typeof createStartManagedEntity>;
   stopManagedEntity: ReturnType<typeof createStopManagedEntity>;
+  updateSandboxService: ReturnType<typeof createUpdateSandboxService>;
 }
 
 export function createControlPlane(environment: NodeJS.ProcessEnv = process.env): ControlPlane {
@@ -65,6 +69,14 @@ export function createControlPlane(environment: NodeJS.ProcessEnv = process.env)
       systemdRuntime,
     }),
     createSandboxService: createCreateSandboxService({
+      metadataSource,
+      systemdRuntime,
+    }),
+    updateSandboxService: createUpdateSandboxService({
+      metadataSource,
+      systemdRuntime,
+    }),
+    deleteSandboxService: createDeleteSandboxService({
       metadataSource,
       systemdRuntime,
     }),

@@ -5,6 +5,7 @@ import { createCreateSandboxService } from "./create-sandbox-service";
 
 function createMetadataSource(): ManagedEntityMetadataSourcePort {
   return {
+    deleteFallbackSandboxService: vi.fn().mockResolvedValue(false),
     deleteManagedEntityMetadata: vi.fn().mockResolvedValue(undefined),
     dangerouslyAdoptFallbackEntity: vi.fn().mockResolvedValue(null),
     dangerouslyAdoptManagedEntity: vi.fn(),
@@ -34,13 +35,16 @@ function createMetadataSource(): ManagedEntityMetadataSourcePort {
       slice: "sandboxd.slice",
     }),
     createFallbackSandboxService: vi.fn(),
+    updateFallbackSandboxService: vi.fn().mockResolvedValue(null),
     updateFallbackEntityState: vi.fn().mockResolvedValue(null),
+    updateManagedEntityMetadata: vi.fn(),
   };
 }
 
 function createRuntime(overrides: Partial<SystemdRuntimePort>): SystemdRuntimePort {
   return {
     createSandboxService: vi.fn().mockResolvedValue(undefined),
+    deleteSandboxService: vi.fn().mockResolvedValue(undefined),
     getUnit: vi.fn().mockResolvedValue({
       unitName: "lab-api.service",
       loadState: "loaded",
@@ -56,6 +60,7 @@ function createRuntime(overrides: Partial<SystemdRuntimePort>): SystemdRuntimePo
     restartUnit: vi.fn().mockResolvedValue(undefined),
     startUnit: vi.fn().mockResolvedValue(undefined),
     stopUnit: vi.fn().mockResolvedValue(undefined),
+    updateSandboxService: vi.fn().mockResolvedValue(undefined),
     ...overrides,
   };
 }

@@ -5,12 +5,14 @@ import { runCli } from "./cli";
 function createControlPlaneMock(): ControlPlane {
   return {
     createSandboxService: vi.fn(),
+    deleteSandboxService: vi.fn(),
     dangerouslyAdoptManagedEntity: vi.fn(),
     inspectManagedEntity: vi.fn(),
     listManagedEntities: vi.fn(),
     restartManagedEntity: vi.fn(),
     startManagedEntity: vi.fn(),
     stopManagedEntity: vi.fn(),
+    updateSandboxService: vi.fn(),
   };
 }
 
@@ -211,5 +213,25 @@ describe("runCli", () => {
 
     expect(exitCode).toBe(2);
     expect(stderr.write).toHaveBeenCalledWith(expect.stringContaining("requires --exec-start"));
+  });
+
+  test("returns exit code 2 for invalid profile flags", async () => {
+    const stderr = { write: vi.fn() };
+
+    const exitCode = await runCli(
+      [
+        "create",
+        "sandboxed-service",
+        "lab-worker",
+        "--exec-start",
+        "/usr/bin/python worker.py",
+        "--profile",
+        "strcit",
+      ],
+      { stderr },
+    );
+
+    expect(exitCode).toBe(2);
+    expect(stderr.write).toHaveBeenCalledWith(expect.stringContaining("Unsupported profile"));
   });
 });

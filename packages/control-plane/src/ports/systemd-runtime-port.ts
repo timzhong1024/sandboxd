@@ -6,6 +6,8 @@ import type {
 
 export interface SystemdRuntimePort {
   createSandboxService(unitName: string, input: CreateSandboxServiceInput): Promise<void>;
+  updateSandboxService(unitName: string, input: CreateSandboxServiceInput): Promise<void>;
+  deleteSandboxService(unitName: string): Promise<void>;
   listUnits(): Promise<SystemdUnitRecord[]>;
   getUnit(unitName: string): Promise<SystemdUnitDetailRecord | null>;
   reloadSystemd(): Promise<void>;

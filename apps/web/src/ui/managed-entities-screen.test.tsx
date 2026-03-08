@@ -59,6 +59,42 @@ test("renders managed entities and badges", () => {
             source: "unit-file",
           },
         ],
+        profileMapping: {
+          profile: "strict",
+          profileDefaults: {
+            noNewPrivileges: true,
+            privateTmp: true,
+            protectSystem: "strict",
+            protectHome: true,
+          },
+          effectiveSandboxing: {
+            noNewPrivileges: true,
+            privateTmp: true,
+            protectSystem: "strict",
+            protectHome: false,
+          },
+          driftItems: [
+            {
+              property: "ProtectHome",
+              expected: true,
+              actual: false,
+              status: "overridden",
+            },
+          ],
+        },
+        validation: {
+          errors: [],
+          warnings: [
+            {
+              code: "unknown-systemd-directive",
+              level: "warning",
+              message: "Unsupported systemd directives were detected.",
+              scope: "entity",
+            },
+          ],
+          readonly: true,
+          readonlyReasons: ["Contains unsupported systemd directives."],
+        },
         status: {
           activeState: "active",
           subState: "running",
@@ -99,6 +135,9 @@ test("renders managed entities and badges", () => {
   expect(screen.getByText("Total entities")).toBeInTheDocument();
   expect(screen.getAllByText("sandboxd.slice")).toHaveLength(1);
   expect(screen.getByText("Resource controls")).toBeInTheDocument();
+  expect(screen.getByText("Validation")).toBeInTheDocument();
+  expect(screen.getByText("Profile mapping")).toBeInTheDocument();
+  expect(screen.getAllByText("Contains unsupported systemd directives.").length).toBeGreaterThan(0);
   expect(screen.getByRole("button", { name: /advanced mode/i })).toHaveAttribute(
     "aria-expanded",
     "false",

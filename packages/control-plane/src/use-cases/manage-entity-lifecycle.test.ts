@@ -35,6 +35,7 @@ function createEntityDetail(unitName = "lab-api.service", state = "active") {
 
 function createMetadataSource(): ManagedEntityMetadataSourcePort {
   return {
+    deleteFallbackSandboxService: vi.fn().mockResolvedValue(false),
     deleteManagedEntityMetadata: vi.fn(),
     dangerouslyAdoptFallbackEntity: vi.fn().mockResolvedValue(null),
     dangerouslyAdoptManagedEntity: vi.fn(),
@@ -50,17 +51,20 @@ function createMetadataSource(): ManagedEntityMetadataSourcePort {
     getFallbackEntityDetail: vi.fn().mockResolvedValue(createEntityDetail()),
     saveManagedEntityMetadata: vi.fn(),
     createFallbackSandboxService: vi.fn(),
+    updateFallbackSandboxService: vi.fn().mockResolvedValue(null),
     updateFallbackEntityState: vi
       .fn()
       .mockImplementation(async (_unitName: string, state: string) =>
         createEntityDetail("lab-api.service", state),
       ),
+    updateManagedEntityMetadata: vi.fn(),
   };
 }
 
 function createRuntime(overrides: Partial<SystemdRuntimePort>): SystemdRuntimePort {
   return {
     createSandboxService: vi.fn().mockResolvedValue(undefined),
+    deleteSandboxService: vi.fn().mockResolvedValue(undefined),
     listUnits: vi.fn().mockResolvedValue([]),
     getUnit: vi.fn().mockResolvedValue({
       unitName: "lab-api.service",
@@ -73,6 +77,7 @@ function createRuntime(overrides: Partial<SystemdRuntimePort>): SystemdRuntimePo
     startUnit: vi.fn().mockResolvedValue(undefined),
     stopUnit: vi.fn().mockResolvedValue(undefined),
     restartUnit: vi.fn().mockResolvedValue(undefined),
+    updateSandboxService: vi.fn().mockResolvedValue(undefined),
     ...overrides,
   };
 }

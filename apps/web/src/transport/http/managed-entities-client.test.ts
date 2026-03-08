@@ -130,3 +130,58 @@ test("creates sandbox services through the API", async () => {
     unitName: "lab-api.service",
   });
 });
+
+test("updates sandbox services through the API", async () => {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        kind: "sandbox-service",
+        origin: "sandboxd",
+        unitName: "lab-api.service",
+        unitType: "service",
+        state: "inactive",
+        labels: {},
+        capabilities: {
+          canInspect: true,
+          canStart: true,
+          canStop: false,
+          canRestart: false,
+        },
+        resourceControls: {},
+        sandboxing: {},
+        status: {
+          activeState: "inactive",
+          subState: "dead",
+          loadState: "loaded",
+        },
+      }),
+    }),
+  );
+
+  const client = createManagedEntitiesHttpClient();
+
+  await expect(
+    client.updateSandboxService("lab-api.service", {
+      name: "lab-api",
+      execStart: "/usr/bin/node server.js",
+    }),
+  ).resolves.toMatchObject({
+    unitName: "lab-api.service",
+  });
+});
+
+test("deletes sandbox services through the API", async () => {
+  vi.stubGlobal(
+    "fetch",
+    vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({}),
+    }),
+  );
+
+  const client = createManagedEntitiesHttpClient();
+
+  await expect(client.deleteSandboxService("lab-api.service")).resolves.toBeUndefined();
+});

@@ -140,3 +140,22 @@ test("parses supported advanced properties and preserves unknown directives", as
     ],
   });
 });
+
+test("ignores legacy unknown profile values instead of failing metadata reads", async () => {
+  const rootDir = await mkdtemp(join(tmpdir(), "sandboxd-metadata-"));
+  tempDirs.push(rootDir);
+  const source = createFilesystemMetadataSource({ rootDir });
+
+  await mkdir(join(rootDir, "lab-legacy.service.d"), { recursive: true });
+  await writeFile(
+    join(rootDir, "lab-legacy.service.d", "90-sandboxd-owned.conf"),
+    ["[X-Sandboxd]", "Owned=yes", "Profile=custom-legacy", ""].join("\n"),
+  );
+
+  await expect(source.getManagedEntityMetadata("lab-legacy.service")).resolves.toMatchObject({
+    unitName: "lab-legacy.service",
+  });
+  await expect(source.getManagedEntityMetadata("lab-legacy.service")).resolves.not.toHaveProperty(
+    "sandboxProfile",
+  );
+});

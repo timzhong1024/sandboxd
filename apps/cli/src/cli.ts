@@ -21,12 +21,14 @@ interface ParsedCommonFlags {
 type CliControlPlane = Pick<
   ControlPlane,
   | "createSandboxService"
+  | "deleteSandboxService"
   | "dangerouslyAdoptManagedEntity"
   | "inspectManagedEntity"
   | "listManagedEntities"
   | "restartManagedEntity"
   | "startManagedEntity"
   | "stopManagedEntity"
+  | "updateSandboxService"
 >;
 
 type CreateDraft = Record<string, string | boolean>;
@@ -85,6 +87,14 @@ export async function runCli(argv: string[], io: CliIo = {}) {
       return await handleCreateCommand(rest, parsed.json, stdout, controlPlane);
     }
 
+    if (command === "update") {
+      return await handleUpdateCommand(rest, parsed.json, stdout, controlPlane);
+    }
+
+    if (command === "delete") {
+      return await handleDeleteCommand(rest, parsed.json, stdout, controlPlane);
+    }
+
     if (command === "dangerous-adopt") {
       return await handleDangerousAdoptCommand(rest, parsed.json, stdout, controlPlane);
     }
@@ -123,7 +133,7 @@ async function handleCreateCommand(
     description: asOptionalString(draft.description),
     workingDirectory: asOptionalString(draft.workingDirectory),
     slice: asOptionalString(draft.slice),
-    sandboxProfile: asOptionalString(draft.profile),
+    sandboxProfile: asOptionalProfile(draft.profile),
     resourceControls: {
       cpuWeight: asOptionalString(draft.cpuWeight),
       memoryMax: asOptionalString(draft.memoryMax),
@@ -151,11 +161,75 @@ async function handleDangerousAdoptCommand(
   const unitName = requirePositional(args[0], "dangerous-adopt requires <unitName>");
   const options = parseDangerousAdoptFlags(args.slice(1));
   const input: DangerousAdoptManagedEntityInput = {
-    sandboxProfile: asOptionalString(options.profile),
+    sandboxProfile: asOptionalProfile(options.profile),
   };
 
   const adopted = await controlPlane.dangerouslyAdoptManagedEntity(unitName, input);
   writeOutput(stdout, json, adopted, formatActionResult("dangerous-adopt", adopted));
+  return 0;
+}
+
+async function handleUpdateCommand(
+  args: string[],
+  json: boolean,
+  stdout: { write(chunk: string): void },
+  controlPlane: CliControlPlane,
+) {
+  if (args[0] !== "sandboxed-service") {
+    throw new CliArgumentError("update requires the sandboxed-service subcommand");
+  }
+
+  const unitName = requirePositional(args[1], "update sandboxed-service requires <unitName>");
+  const draft = parseCreateFlags(args.slice(2));
+  const execStart = asOptionalString(draft.execStart);
+  if (!execStart) {
+    throw new CliArgumentError("update sandboxed-service requires --exec-start <cmd>");
+  }
+
+  const input: CreateSandboxServiceInput = {
+    name: unitName.replace(/\.service$/, ""),
+    execStart,
+    description: asOptionalString(draft.description),
+    workingDirectory: asOptionalString(draft.workingDirectory),
+    slice: asOptionalString(draft.slice),
+    sandboxProfile: asOptionalProfile(draft.profile),
+    resourceControls: {
+      cpuWeight: asOptionalString(draft.cpuWeight),
+      memoryMax: asOptionalString(draft.memoryMax),
+      tasksMax: asOptionalString(draft.tasksMax),
+    },
+    sandboxing: {
+      noNewPrivileges: asOptionalBoolean(draft.noNewPrivileges),
+      privateTmp: asOptionalBoolean(draft.privateTmp),
+      protectSystem: asOptionalString(draft.protectSystem),
+      protectHome: asOptionalBoolean(draft.protectHome),
+    },
+  };
+
+  const updated = await controlPlane.updateSandboxService(unitName, input);
+  writeOutput(stdout, json, updated, formatActionResult("update", updated));
+  return 0;
+}
+
+async function handleDeleteCommand(
+  args: string[],
+  json: boolean,
+  stdout: { write(chunk: string): void },
+  controlPlane: CliControlPlane,
+) {
+  if (args[0] !== "sandboxed-service") {
+    throw new CliArgumentError("delete requires the sandboxed-service subcommand");
+  }
+
+  const unitName = requirePositional(args[1], "delete sandboxed-service requires <unitName>");
+  await controlPlane.deleteSandboxService(unitName);
+
+  if (json) {
+    stdout.write(`${JSON.stringify({ deleted: true, unitName }, null, 2)}\n`);
+  } else {
+    stdout.write(`delete: ${unitName}\n`);
+  }
+
   return 0;
 }
 
@@ -268,6 +342,18 @@ function asOptionalBoolean(value: string | boolean | undefined) {
   return typeof value === "boolean" ? value : undefined;
 }
 
+function asOptionalProfile(value: string | boolean | undefined) {
+  if (value === undefined || typeof value === "boolean") {
+    return undefined;
+  }
+
+  if (value === "baseline" || value === "strict") {
+    return value;
+  }
+
+  throw new CliArgumentError(`Unsupported profile: ${value}`);
+}
+
 function writeOutput(
   stdout: { write(chunk: string): void },
   json: boolean,
@@ -351,4 +437,6 @@ const usageText = `Usage:
   sandboxctl stop <unitName> [--json]
   sandboxctl restart <unitName> [--json]
   sandboxctl dangerous-adopt <unitName> [--profile <profile>] [--json]
-  sandboxctl create sandboxed-service <name> --exec-start <cmd> [flags...] [--json]`;
+  sandboxctl create sandboxed-service <name> --exec-start <cmd> [flags...] [--json]
+  sandboxctl update sandboxed-service <unitName> --exec-start <cmd> [flags...] [--json]
+  sandboxctl delete sandboxed-service <unitName> [--json]`;

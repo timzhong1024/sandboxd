@@ -1,8 +1,10 @@
 import { expect, test } from "vitest";
 import {
+  buildProfileMapping,
   getSupportedAdvancedPropertyGroupSpec,
   getSupportedAdvancedPropertySpec,
   getManagedEntityCapabilities,
+  getSandboxProfileDefaults,
   parseAdvancedPropertyDirective,
   supportedAdvancedPropertySpecs,
   getUnitType,
@@ -13,6 +15,7 @@ import {
   parseDangerousAdoptManagedEntityInput,
   parseManagedEntityDetail,
   parseManagedEntitySummaries,
+  validateManagedEntityConfig,
   type ManagedEntitySummary,
 } from "./index";
 
@@ -473,7 +476,7 @@ test("exposes the first-batch advanced property registry", () => {
     group: "filesystem",
     level: "recommended",
     supportsRawFallback: true,
-    supportStatus: "inspect-only",
+    supportStatus: "editable-in-phase-2",
   });
   expect(getSupportedAdvancedPropertySpec("RestrictNamespaces")).toMatchObject({
     supportedModes: ["allow", "deny", "reset", "boolean"],
@@ -482,4 +485,87 @@ test("exposes the first-batch advanced property registry", () => {
   expect(getSupportedAdvancedPropertyGroupSpec("filesystem")).toMatchObject({
     title: "Filesystem",
   });
+});
+
+test("derives sandbox profile defaults and drift mapping", () => {
+  expect(getSandboxProfileDefaults("strict")).toMatchObject({
+    noNewPrivileges: true,
+    privateTmp: true,
+    protectSystem: "strict",
+    protectHome: true,
+  });
+
+  expect(
+    buildProfileMapping({
+      sandboxProfile: "baseline",
+      sandboxing: {
+        protectSystem: "strict",
+      },
+      advancedProperties: {},
+    }).driftItems,
+  ).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        property: "ProtectSystem",
+        expected: "full",
+        actual: "strict",
+        status: "overridden",
+      }),
+    ]),
+  );
+});
+
+test("flags duplicate and readonly configuration problems", () => {
+  const result = validateManagedEntityConfig({
+    sandboxProfile: "baseline",
+    sandboxing: {
+      protectSystem: "full",
+    },
+    resourceControls: {
+      cpuWeight: "200",
+    },
+    advancedProperties: {
+      CPUWeight: {
+        parsed: {
+          kind: "value",
+          value: 200,
+        },
+      },
+      SystemCallFilter: [
+        {
+          raw: "@system-service ~@privileged",
+        },
+      ],
+    },
+    unknownSystemdDirectives: [
+      {
+        section: "Service",
+        key: "IPAddressDeny",
+        value: "any",
+        source: "unit-file",
+      },
+    ],
+  });
+
+  expect(result.errors).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        code: "duplicate-expression",
+        propertyKey: "CPUWeight",
+      }),
+    ]),
+  );
+  expect(result.warnings).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        code: "profile-override",
+        propertyKey: "ProtectSystem",
+      }),
+      expect.objectContaining({
+        code: "raw-advanced-property",
+        propertyKey: "SystemCallFilter",
+      }),
+    ]),
+  );
+  expect(result.readonly).toBe(true);
 });

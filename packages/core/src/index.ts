@@ -29,6 +29,50 @@ export const sandboxingSchema = z.object({
   protectHome: z.boolean().optional(),
 });
 
+export const sandboxProfileSchema = z.enum(["baseline", "strict"]);
+
+export const profileSandboxingPropertyKeySchema = z.enum([
+  "NoNewPrivileges",
+  "PrivateTmp",
+  "ProtectSystem",
+  "ProtectHome",
+]);
+
+const validationScopeSchema = z.enum(["entity", "property"]);
+const validationLevelSchema = z.enum(["error", "warning"]);
+const validationPropertyKeySchema = z.string();
+const profileDriftStatusSchema = z.enum(["matched", "overridden", "extra", "unknown"]);
+const comparableConfigValueSchema = z.union([z.string(), z.boolean(), z.null()]);
+
+export const validationIssueSchema = z.object({
+  code: z.string(),
+  level: validationLevelSchema,
+  message: z.string(),
+  scope: validationScopeSchema,
+  propertyKey: validationPropertyKeySchema.optional(),
+});
+
+export const validationResultSchema = z.object({
+  errors: z.array(validationIssueSchema),
+  warnings: z.array(validationIssueSchema),
+  readonly: z.boolean(),
+  readonlyReasons: z.array(z.string()),
+});
+
+export const profileDriftItemSchema = z.object({
+  property: profileSandboxingPropertyKeySchema,
+  expected: comparableConfigValueSchema,
+  actual: comparableConfigValueSchema,
+  status: profileDriftStatusSchema,
+});
+
+export const profileMappingSchema = z.object({
+  profile: sandboxProfileSchema.optional(),
+  profileDefaults: sandboxingSchema,
+  effectiveSandboxing: sandboxingSchema,
+  driftItems: z.array(profileDriftItemSchema),
+});
+
 export const managedEntitySummarySchema = z.object({
   kind: managedEntityKindSchema,
   origin: managedEntityOriginSchema,
@@ -39,7 +83,7 @@ export const managedEntitySummarySchema = z.object({
   loadState: z.string().optional(),
   slice: z.string().optional(),
   description: z.string().optional(),
-  sandboxProfile: z.string().optional(),
+  sandboxProfile: sandboxProfileSchema.optional(),
   resourceControls: resourceControlsSchema.optional(),
   sandboxing: sandboxingSchema.optional(),
   labels: z.record(z.string(), z.string()),
@@ -227,7 +271,7 @@ export const advancedPropertySpecSchema = z.object({
   description: z.string(),
   supportsRawFallback: z.boolean(),
   supportedModes: z.array(z.enum(["allow", "deny", "reset", "boolean"])).optional(),
-  supportStatus: z.enum(["inspect-only", "planned"]),
+  supportStatus: z.enum(["inspect-only", "editable-in-phase-2"]),
 });
 
 export const advancedPropertyGroupSpecSchema = z.object({
@@ -247,7 +291,9 @@ export const managedEntityDetailSchema = managedEntitySummarySchema.extend({
   sandboxing: sandboxingSchema,
   advancedProperties: advancedPropertiesSchema.optional(),
   unknownSystemdDirectives: z.array(unknownSystemdDirectiveSchema).optional(),
+  profileMapping: profileMappingSchema.optional(),
   status: managedEntityStatusSchema,
+  validation: validationResultSchema.optional(),
 });
 
 export const createSandboxServiceInputSchema = z.object({
@@ -257,14 +303,14 @@ export const createSandboxServiceInputSchema = z.object({
   workingDirectory: z.string().optional(),
   environment: z.record(z.string(), z.string()).optional(),
   slice: z.string().optional(),
-  sandboxProfile: z.string().optional(),
+  sandboxProfile: sandboxProfileSchema.optional(),
   resourceControls: resourceControlsSchema.optional(),
   sandboxing: sandboxingSchema.optional(),
   advancedProperties: advancedPropertiesSchema.optional(),
 });
 
 export const dangerousAdoptManagedEntityInputSchema = z.object({
-  sandboxProfile: z.string().optional(),
+  sandboxProfile: sandboxProfileSchema.optional(),
 });
 
 export const managedEntitySummariesSchema = z.array(managedEntitySummarySchema);
@@ -297,6 +343,8 @@ export type ManagedEntityDetail = z.infer<typeof managedEntityDetailSchema>;
 export type ManagedEntityStatus = z.infer<typeof managedEntityStatusSchema>;
 export type ResourceControls = z.infer<typeof resourceControlsSchema>;
 export type Sandboxing = z.infer<typeof sandboxingSchema>;
+export type SandboxProfile = z.infer<typeof sandboxProfileSchema>;
+export type ProfileSandboxingPropertyKey = z.infer<typeof profileSandboxingPropertyKeySchema>;
 export type AdvancedPropertyGroup = z.infer<typeof advancedPropertyGroupSchema>;
 export type AdvancedPropertyLevel = z.infer<typeof advancedPropertyLevelSchema>;
 export type AdvancedPropertyValueType = z.infer<typeof advancedPropertyValueTypeSchema>;
@@ -308,6 +356,10 @@ export type SizeLimitValue = z.infer<typeof sizeLimitValueSchema>;
 export type CountLimitValue = z.infer<typeof countLimitValueSchema>;
 export type AdvancedProperties = z.infer<typeof advancedPropertiesSchema>;
 export type UnknownSystemdDirective = z.infer<typeof unknownSystemdDirectiveSchema>;
+export type ValidationIssue = z.infer<typeof validationIssueSchema>;
+export type ValidationResult = z.infer<typeof validationResultSchema>;
+export type ProfileDriftItem = z.infer<typeof profileDriftItemSchema>;
+export type ProfileMapping = z.infer<typeof profileMappingSchema>;
 export type AdvancedPropertySpec = z.infer<typeof advancedPropertySpecSchema>;
 export type AdvancedPropertyGroupSpec = z.infer<typeof advancedPropertyGroupSpecSchema>;
 export type CreateSandboxServiceInput = z.infer<typeof createSandboxServiceInputSchema>;
@@ -326,7 +378,7 @@ export const supportedAdvancedPropertySpecs = [
     valueType: "enum",
     description: "Restrict writes to core system directories.",
     supportsRawFallback: true,
-    supportStatus: "inspect-only",
+    supportStatus: "editable-in-phase-2",
   },
   {
     key: "ProtectHome",
@@ -336,7 +388,7 @@ export const supportedAdvancedPropertySpecs = [
     valueType: "enum",
     description: "Limit access to user home directories.",
     supportsRawFallback: true,
-    supportStatus: "inspect-only",
+    supportStatus: "editable-in-phase-2",
   },
   {
     key: "PrivateTmp",
@@ -346,7 +398,7 @@ export const supportedAdvancedPropertySpecs = [
     valueType: "enum",
     description: "Give the service a private /tmp and /var/tmp namespace.",
     supportsRawFallback: true,
-    supportStatus: "inspect-only",
+    supportStatus: "editable-in-phase-2",
   },
   {
     key: "ReadOnlyPaths",
@@ -356,7 +408,7 @@ export const supportedAdvancedPropertySpecs = [
     valueType: "path-list",
     description: "Mount selected paths read-only for the service.",
     supportsRawFallback: true,
-    supportStatus: "inspect-only",
+    supportStatus: "editable-in-phase-2",
   },
   {
     key: "ReadWritePaths",
@@ -366,7 +418,7 @@ export const supportedAdvancedPropertySpecs = [
     valueType: "path-list",
     description: "Allow writes only to selected paths when broader FS protections are active.",
     supportsRawFallback: true,
-    supportStatus: "inspect-only",
+    supportStatus: "editable-in-phase-2",
   },
   {
     key: "InaccessiblePaths",
@@ -376,7 +428,7 @@ export const supportedAdvancedPropertySpecs = [
     valueType: "path-list",
     description: "Hide selected filesystem paths from the service.",
     supportsRawFallback: true,
-    supportStatus: "inspect-only",
+    supportStatus: "editable-in-phase-2",
   },
   {
     key: "NoNewPrivileges",
@@ -386,7 +438,7 @@ export const supportedAdvancedPropertySpecs = [
     valueType: "boolean",
     description: "Prevent the service and its children from gaining new privileges.",
     supportsRawFallback: true,
-    supportStatus: "inspect-only",
+    supportStatus: "editable-in-phase-2",
   },
   {
     key: "CapabilityBoundingSet",
@@ -397,7 +449,7 @@ export const supportedAdvancedPropertySpecs = [
     description: "Limit Linux capabilities available to the service.",
     supportsRawFallback: true,
     supportedModes: ["allow", "deny", "reset"],
-    supportStatus: "inspect-only",
+    supportStatus: "editable-in-phase-2",
   },
   {
     key: "PrivateDevices",
@@ -407,7 +459,7 @@ export const supportedAdvancedPropertySpecs = [
     valueType: "boolean",
     description: "Hide most host device nodes and provide a private minimal /dev.",
     supportsRawFallback: true,
-    supportStatus: "inspect-only",
+    supportStatus: "editable-in-phase-2",
   },
   {
     key: "PrivateUsers",
@@ -417,7 +469,7 @@ export const supportedAdvancedPropertySpecs = [
     valueType: "boolean",
     description: "Run the service in a private user namespace.",
     supportsRawFallback: true,
-    supportStatus: "inspect-only",
+    supportStatus: "editable-in-phase-2",
   },
   {
     key: "PrivateNetwork",
@@ -427,7 +479,7 @@ export const supportedAdvancedPropertySpecs = [
     valueType: "boolean",
     description: "Run the service in a private network namespace.",
     supportsRawFallback: true,
-    supportStatus: "inspect-only",
+    supportStatus: "editable-in-phase-2",
   },
   {
     key: "RestrictNamespaces",
@@ -438,7 +490,7 @@ export const supportedAdvancedPropertySpecs = [
     description: "Limit which Linux namespace types the service may create.",
     supportsRawFallback: true,
     supportedModes: ["allow", "deny", "reset", "boolean"],
-    supportStatus: "inspect-only",
+    supportStatus: "editable-in-phase-2",
   },
   {
     key: "SystemCallFilter",
@@ -449,7 +501,7 @@ export const supportedAdvancedPropertySpecs = [
     description: "Allow or deny selected syscall groups and names.",
     supportsRawFallback: true,
     supportedModes: ["allow", "deny", "reset"],
-    supportStatus: "inspect-only",
+    supportStatus: "editable-in-phase-2",
   },
   {
     key: "RestrictAddressFamilies",
@@ -460,7 +512,7 @@ export const supportedAdvancedPropertySpecs = [
     description: "Limit socket address families available to the service.",
     supportsRawFallback: true,
     supportedModes: ["allow", "deny", "reset"],
-    supportStatus: "inspect-only",
+    supportStatus: "editable-in-phase-2",
   },
   {
     key: "CPUWeight",
@@ -470,7 +522,7 @@ export const supportedAdvancedPropertySpecs = [
     valueType: "cpu-weight",
     description: "Relative CPU scheduling weight for the service cgroup.",
     supportsRawFallback: true,
-    supportStatus: "inspect-only",
+    supportStatus: "editable-in-phase-2",
   },
   {
     key: "MemoryMax",
@@ -480,7 +532,7 @@ export const supportedAdvancedPropertySpecs = [
     valueType: "size-limit",
     description: "Hard memory limit for the service cgroup.",
     supportsRawFallback: true,
-    supportStatus: "inspect-only",
+    supportStatus: "editable-in-phase-2",
   },
   {
     key: "TasksMax",
@@ -490,7 +542,7 @@ export const supportedAdvancedPropertySpecs = [
     valueType: "count-limit",
     description: "Maximum number of tasks allowed for the service.",
     supportsRawFallback: true,
-    supportStatus: "inspect-only",
+    supportStatus: "editable-in-phase-2",
   },
   {
     key: "WorkingDirectory",
@@ -500,7 +552,7 @@ export const supportedAdvancedPropertySpecs = [
     valueType: "path",
     description: "Working directory before the service starts.",
     supportsRawFallback: true,
-    supportStatus: "inspect-only",
+    supportStatus: "editable-in-phase-2",
   },
   {
     key: "Environment",
@@ -510,7 +562,7 @@ export const supportedAdvancedPropertySpecs = [
     valueType: "environment",
     description: "Environment variables injected into the service process.",
     supportsRawFallback: true,
-    supportStatus: "inspect-only",
+    supportStatus: "editable-in-phase-2",
   },
 ] as const satisfies ReadonlyArray<AdvancedPropertySpec>;
 
@@ -893,6 +945,295 @@ function parseDirectiveBoolean(value: string | undefined) {
   return undefined;
 }
 
+const profileSandboxingBindings = [
+  {
+    property: "NoNewPrivileges",
+    advancedKey: "NoNewPrivileges",
+    sandboxingKey: "noNewPrivileges",
+  },
+  {
+    property: "PrivateTmp",
+    advancedKey: "PrivateTmp",
+    sandboxingKey: "privateTmp",
+  },
+  {
+    property: "ProtectSystem",
+    advancedKey: "ProtectSystem",
+    sandboxingKey: "protectSystem",
+  },
+  {
+    property: "ProtectHome",
+    advancedKey: "ProtectHome",
+    sandboxingKey: "protectHome",
+  },
+] as const satisfies ReadonlyArray<{
+  advancedKey: "NoNewPrivileges" | "PrivateTmp" | "ProtectSystem" | "ProtectHome";
+  property: ProfileSandboxingPropertyKey;
+  sandboxingKey: keyof Sandboxing;
+}>;
+
+interface ManagedEntityValidationInput {
+  advancedProperties?: AdvancedProperties;
+  environment?: Record<string, string>;
+  resourceControls?: ResourceControls;
+  sandboxProfile?: SandboxProfile;
+  sandboxing?: Sandboxing;
+  unknownSystemdDirectives?: UnknownSystemdDirective[];
+  workingDirectory?: string;
+}
+
+export function getSandboxProfileDefaults(profile: SandboxProfile | undefined): Sandboxing {
+  if (profile === "strict") {
+    return {
+      noNewPrivileges: true,
+      privateTmp: true,
+      protectSystem: "strict",
+      protectHome: true,
+    };
+  }
+
+  if (profile === "baseline") {
+    return {
+      noNewPrivileges: true,
+      privateTmp: true,
+      protectSystem: "full",
+      protectHome: false,
+    };
+  }
+
+  return {};
+}
+
+export function validateManagedEntityConfig(input: ManagedEntityValidationInput): ValidationResult {
+  const errors: ValidationIssue[] = [];
+  const warnings: ValidationIssue[] = [];
+  const readonlyReasons: string[] = [];
+
+  for (const binding of profileSandboxingBindings) {
+    if (input.sandboxProfile && input.sandboxing?.[binding.sandboxingKey] !== undefined) {
+      warnings.push({
+        code: "profile-override",
+        level: "warning",
+        message: `${binding.property} overrides the selected sandbox profile default.`,
+        propertyKey: binding.property,
+        scope: "property",
+      });
+    }
+  }
+
+  const duplicates = [
+    {
+      actual: input.resourceControls?.cpuWeight,
+      advanced: input.advancedProperties?.CPUWeight,
+      propertyKey: "CPUWeight",
+    },
+    {
+      actual: input.resourceControls?.memoryMax,
+      advanced: input.advancedProperties?.MemoryMax,
+      propertyKey: "MemoryMax",
+    },
+    {
+      actual: input.resourceControls?.tasksMax,
+      advanced: input.advancedProperties?.TasksMax,
+      propertyKey: "TasksMax",
+    },
+    {
+      actual: input.sandboxing?.noNewPrivileges,
+      advanced: input.advancedProperties?.NoNewPrivileges,
+      propertyKey: "NoNewPrivileges",
+    },
+    {
+      actual: input.sandboxing?.privateTmp,
+      advanced: input.advancedProperties?.PrivateTmp,
+      propertyKey: "PrivateTmp",
+    },
+    {
+      actual: input.sandboxing?.protectSystem,
+      advanced: input.advancedProperties?.ProtectSystem,
+      propertyKey: "ProtectSystem",
+    },
+    {
+      actual: input.sandboxing?.protectHome,
+      advanced: input.advancedProperties?.ProtectHome,
+      propertyKey: "ProtectHome",
+    },
+    {
+      actual: input.workingDirectory,
+      advanced: input.advancedProperties?.WorkingDirectory,
+      propertyKey: "WorkingDirectory",
+    },
+    {
+      actual: input.environment,
+      advanced: input.advancedProperties?.Environment,
+      propertyKey: "Environment",
+    },
+  ] as const;
+
+  for (const duplicate of duplicates) {
+    if (
+      duplicate.actual !== undefined &&
+      duplicate.actual !== null &&
+      hasConfiguredAdvancedValue(duplicate.advanced)
+    ) {
+      errors.push({
+        code: "duplicate-expression",
+        level: "error",
+        message: `${duplicate.propertyKey} is configured through more than one field.`,
+        propertyKey: duplicate.propertyKey,
+        scope: "property",
+      });
+    }
+  }
+
+  const rawAdvancedKeys = listRawAdvancedPropertyKeys(input.advancedProperties);
+  for (const propertyKey of rawAdvancedKeys) {
+    warnings.push({
+      code: "raw-advanced-property",
+      level: "warning",
+      message: `${propertyKey} contains raw content and cannot be safely round-tripped.`,
+      propertyKey,
+      scope: "property",
+    });
+  }
+  if (rawAdvancedKeys.length > 0) {
+    readonlyReasons.push(
+      "Contains raw advanced systemd directives that sandboxd cannot safely rewrite.",
+    );
+  }
+
+  if ((input.unknownSystemdDirectives?.length ?? 0) > 0) {
+    warnings.push({
+      code: "unknown-systemd-directive",
+      level: "warning",
+      message: "Unsupported systemd directives were detected and the entity remains inspect-only.",
+      scope: "entity",
+    });
+    readonlyReasons.push(
+      "Contains unsupported systemd directives that sandboxd cannot safely preserve during updates.",
+    );
+  }
+
+  return {
+    errors,
+    warnings,
+    readonly: readonlyReasons.length > 0,
+    readonlyReasons,
+  };
+}
+
+export function buildProfileMapping(
+  detail: Pick<ManagedEntityDetail, "advancedProperties" | "sandboxProfile" | "sandboxing">,
+): ProfileMapping {
+  const profileDefaults = getSandboxProfileDefaults(detail.sandboxProfile);
+  const effectiveSandboxing = {
+    ...profileDefaults,
+    ...detail.sandboxing,
+  };
+  const driftItems = profileSandboxingBindings.map((binding) => {
+    const expected = toComparableConfigValue(profileDefaults[binding.sandboxingKey]);
+    const actual = getComparableEffectiveValue(
+      detail.advancedProperties?.[binding.advancedKey],
+      effectiveSandboxing[binding.sandboxingKey],
+    );
+
+    return {
+      property: binding.property,
+      expected,
+      actual,
+      status: resolveProfileDriftStatus(expected, actual),
+    } satisfies ProfileDriftItem;
+  });
+
+  return {
+    profile: detail.sandboxProfile,
+    profileDefaults,
+    effectiveSandboxing,
+    driftItems,
+  };
+}
+
+export function enrichManagedEntityDetail(detail: ManagedEntityDetail): ManagedEntityDetail {
+  return {
+    ...detail,
+    profileMapping: buildProfileMapping(detail),
+    validation: validateManagedEntityConfig(detail),
+  };
+}
+
+function resolveProfileDriftStatus(
+  expected: ProfileDriftItem["expected"],
+  actual: ProfileDriftItem["actual"],
+): ProfileDriftItem["status"] {
+  if (actual === null && expected === null) {
+    return "matched";
+  }
+
+  if (actual === null) {
+    return "unknown";
+  }
+
+  if (expected === null) {
+    return "extra";
+  }
+
+  return expected === actual ? "matched" : "overridden";
+}
+
+function getComparableEffectiveValue(
+  advancedValue:
+    | AdvancedProperties["NoNewPrivileges"]
+    | AdvancedProperties["PrivateTmp"]
+    | AdvancedProperties["ProtectSystem"]
+    | AdvancedProperties["ProtectHome"]
+    | undefined,
+  fallbackValue: string | boolean | undefined,
+) {
+  if (advancedValue?.raw !== undefined) {
+    return null;
+  }
+
+  if (advancedValue?.parsed !== undefined) {
+    return toComparableConfigValue(advancedValue.parsed);
+  }
+
+  return toComparableConfigValue(fallbackValue);
+}
+
+function toComparableConfigValue(value: unknown): string | boolean | null {
+  if (typeof value === "boolean" || typeof value === "string") {
+    return value;
+  }
+
+  return null;
+}
+
+function hasConfiguredAdvancedValue(value: unknown) {
+  if (Array.isArray(value)) {
+    return value.length > 0;
+  }
+
+  return value !== undefined;
+}
+
+function listRawAdvancedPropertyKeys(advancedProperties: AdvancedProperties | undefined) {
+  if (!advancedProperties) {
+    return [] as SupportedAdvancedPropertyKey[];
+  }
+
+  return supportedAdvancedPropertyKeys.filter((key) => {
+    const value = advancedProperties[key];
+    if (!value) {
+      return false;
+    }
+
+    if (Array.isArray(value)) {
+      return value.some((entry) => entry.raw !== undefined);
+    }
+
+    return typeof value === "object" && value !== null && "raw" in value && value.raw !== undefined;
+  });
+}
+
 export function isSandboxdManaged(entity: ManagedEntitySummary | ManagedEntityDetail) {
   return entity.origin === "sandboxd";
 }
@@ -946,7 +1287,7 @@ export function mapSystemdUnitRecord(record: SystemdUnitRecord): ManagedEntitySu
 export function mapSystemdUnitDetailRecord(record: SystemdUnitDetailRecord): ManagedEntityDetail {
   const summary = mapSystemdUnitRecord(record);
 
-  return {
+  return enrichManagedEntityDetail({
     ...summary,
     resourceControls: record.resourceControls ?? {},
     sandboxing: record.sandboxing ?? {},
@@ -957,7 +1298,7 @@ export function mapSystemdUnitDetailRecord(record: SystemdUnitDetailRecord): Man
       subState: record.subState,
       loadState: record.loadState,
     },
-  };
+  });
 }
 
 export function parseManagedEntitySummaries(input: unknown): ManagedEntitySummary[] {

@@ -50,6 +50,8 @@ test("registers control-plane and property registry tools", async () => {
     restartManagedEntity: vi.fn().mockResolvedValue(createEntityDetail()),
     dangerouslyAdoptManagedEntity: vi.fn().mockResolvedValue(createEntityDetail("docker.service")),
     createSandboxService: vi.fn().mockResolvedValue(createEntityDetail("lab-worker.service")),
+    updateSandboxService: vi.fn().mockResolvedValue(createEntityDetail("lab-worker.service")),
+    deleteSandboxService: vi.fn().mockResolvedValue(undefined),
   });
   const client = new Client({
     name: "sandboxd-mcp-test-client",
@@ -67,6 +69,7 @@ test("registers control-plane and property registry tools", async () => {
   expect(toolNames).toEqual([
     "create_sandboxed_service",
     "dangerously_adopt_service",
+    "delete_sandboxed_service",
     "describe_systemd_property",
     "inspect",
     "list",
@@ -74,6 +77,7 @@ test("registers control-plane and property registry tools", async () => {
     "restart",
     "start",
     "stop",
+    "update_sandboxed_service",
   ]);
 });
 
@@ -87,6 +91,8 @@ test("invokes injected handlers and returns JSON text payloads", async () => {
     restartManagedEntity: vi.fn().mockResolvedValue(createEntityDetail()),
     dangerouslyAdoptManagedEntity: vi.fn().mockResolvedValue(createEntityDetail("docker.service")),
     createSandboxService: vi.fn().mockResolvedValue(createEntityDetail("lab-worker.service")),
+    updateSandboxService: vi.fn().mockResolvedValue(createEntityDetail("lab-worker.service")),
+    deleteSandboxService: vi.fn().mockResolvedValue(undefined),
   });
   const client = new Client({
     name: "sandboxd-mcp-test-client",
@@ -129,6 +135,8 @@ test("returns supported property descriptions for agent-friendly discovery", asy
     restartManagedEntity: vi.fn().mockResolvedValue(createEntityDetail()),
     dangerouslyAdoptManagedEntity: vi.fn().mockResolvedValue(createEntityDetail("docker.service")),
     createSandboxService: vi.fn().mockResolvedValue(createEntityDetail("lab-worker.service")),
+    updateSandboxService: vi.fn().mockResolvedValue(createEntityDetail("lab-worker.service")),
+    deleteSandboxService: vi.fn().mockResolvedValue(undefined),
   });
   const client = new Client({
     name: "sandboxd-mcp-test-client",
@@ -169,6 +177,6 @@ test("returns supported property descriptions for agent-friendly discovery", asy
     key: "ProtectSystem",
     group: "filesystem",
     supportsRawFallback: true,
-    supportStatus: "inspect-only",
+    supportStatus: "editable-in-phase-2",
   });
 });

@@ -393,6 +393,8 @@ export function ManagedEntitiesScreen({
               ) : detail ? (
                 <>
                   <DetailGrid detail={detail} />
+                  <ValidationSection detail={detail} />
+                  <ProfileMappingSection detail={detail} />
                   <AdvancedModeSection
                     detail={detail}
                     enabled={isAdvancedMode}
@@ -675,6 +677,96 @@ function DetailGrid({ detail }: { detail: ManagedEntityDetail }) {
   );
 }
 
+function ValidationSection({ detail }: { detail: ManagedEntityDetail }) {
+  const validation = detail.validation;
+  if (!validation) {
+    return null;
+  }
+
+  const issues = [...validation.errors, ...validation.warnings];
+  if (issues.length === 0 && !validation.readonly) {
+    return null;
+  }
+
+  return (
+    <Panel density="compact" className="space-y-3">
+      <div className="flex items-center gap-2 text-sm font-medium text-white">
+        <ShieldCheck className="h-4 w-4 text-[color:var(--color-accent)]" />
+        Validation
+      </div>
+      {validation.readonly ? (
+        <div className="rounded-[16px] border border-amber-300/20 bg-amber-300/[0.08] px-4 py-3 text-sm text-white/86">
+          <div className="font-medium text-white">Inspect only</div>
+          <div className="mt-1 text-[color:var(--color-text-muted)]">
+            {validation.readonlyReasons.join(" ")}
+          </div>
+        </div>
+      ) : null}
+      {issues.length > 0 ? (
+        <div className="grid gap-2">
+          {issues.map((issue, index) => (
+            <div
+              key={`${issue.code}-${issue.propertyKey ?? "entity"}-${index}`}
+              className={`rounded-[14px] border px-4 py-3 text-sm ${
+                issue.level === "error"
+                  ? "border-red-300/20 bg-red-300/[0.08] text-white/88"
+                  : "border-sky-300/20 bg-sky-300/[0.08] text-white/84"
+              }`}
+            >
+              <div className="font-medium text-white">
+                {issue.level === "error" ? "Error" : "Warning"}
+                {issue.propertyKey ? ` · ${issue.propertyKey}` : ""}
+              </div>
+              <div className="mt-1 text-[color:var(--color-text-muted)]">{issue.message}</div>
+            </div>
+          ))}
+        </div>
+      ) : null}
+    </Panel>
+  );
+}
+
+function ProfileMappingSection({ detail }: { detail: ManagedEntityDetail }) {
+  if (!detail.profileMapping) {
+    return null;
+  }
+
+  return (
+    <Panel density="compact" className="space-y-4">
+      <div className="flex items-center gap-2 text-sm font-medium text-white">
+        <Layers2 className="h-4 w-4 text-[color:var(--color-accent)]" />
+        Profile mapping
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <MetaBlock label="Profile" value={detail.profileMapping.profile ?? "n/a"} />
+        <MetaBlock
+          label="Compared properties"
+          value={String(detail.profileMapping.driftItems.length)}
+        />
+      </div>
+      <div className="grid gap-2">
+        {detail.profileMapping.driftItems.map((item) => (
+          <div
+            key={item.property}
+            className="flex flex-col gap-2 rounded-[16px] border border-[color:var(--color-border)] bg-black/10 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+          >
+            <div>
+              <div className="text-sm font-medium text-white">{item.property}</div>
+              <div className="mt-1 text-xs text-[color:var(--color-text-muted)]">
+                expected {formatComparableValue(item.expected)} · actual{" "}
+                {formatComparableValue(item.actual)}
+              </div>
+            </div>
+            <span className="inline-flex rounded-full border border-[color:var(--color-border)] px-2.5 py-1 text-[10px] uppercase tracking-[0.16em] text-white/78">
+              {item.status}
+            </span>
+          </div>
+        ))}
+      </div>
+    </Panel>
+  );
+}
+
 function AdvancedModeSection({
   detail,
   enabled,
@@ -707,6 +799,11 @@ function AdvancedModeSection({
             Structured systemd property inspection driven by the shared registry. Editing stays
             disabled until validation and write-path support land.
           </p>
+          {detail.validation?.readonly ? (
+            <p className="mt-2 text-xs leading-5 text-amber-200/78">
+              {detail.validation.readonlyReasons[0]}
+            </p>
+          ) : null}
         </div>
         <button
           type="button"
@@ -1616,13 +1713,18 @@ function getPropertyLevelHoverTextClass(level: AdvancedPropertySpec["level"]) {
 }
 
 function createInputFromDraft(draft: CreateSandboxServiceDraft): CreateSandboxServiceInput {
+  const sandboxProfile =
+    draft.sandboxProfile === "baseline" || draft.sandboxProfile === "strict"
+      ? draft.sandboxProfile
+      : undefined;
+
   return {
     name: draft.name,
     execStart: draft.execStart,
     description: draft.description || undefined,
     workingDirectory: draft.workingDirectory || undefined,
     slice: draft.slice || undefined,
-    sandboxProfile: draft.sandboxProfile || undefined,
+    sandboxProfile,
     resourceControls: {
       cpuWeight: draft.cpuWeight || undefined,
       memoryMax: draft.memoryMax || undefined,
@@ -1643,6 +1745,18 @@ function formatBoolean(value: boolean | undefined) {
   }
 
   return value ? "yes" : "no";
+}
+
+function formatComparableValue(value: string | boolean | null) {
+  if (value === null) {
+    return "n/a";
+  }
+
+  if (typeof value === "boolean") {
+    return value ? "yes" : "no";
+  }
+
+  return value;
 }
 
 function buildEnumOptions(spec: AdvancedPropertySpec) {

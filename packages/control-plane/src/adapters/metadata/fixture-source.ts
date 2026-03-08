@@ -4,6 +4,7 @@ import type {
   ManagedEntityDetail,
   ManagedEntitySummary,
 } from "@sandboxd/core";
+import { getSandboxProfileDefaults } from "@sandboxd/core";
 import { z } from "zod";
 import {
   managedEntityFixtureNames,
@@ -213,11 +214,31 @@ const fixtureNameSchema = z.enum(managedEntityFixtureNames);
 function cloneEntity(entity: ManagedEntityDetail): ManagedEntityDetail {
   return {
     ...entity,
+    advancedProperties: entity.advancedProperties ? { ...entity.advancedProperties } : undefined,
     labels: { ...entity.labels },
     capabilities: { ...entity.capabilities },
+    profileMapping: entity.profileMapping
+      ? {
+          ...entity.profileMapping,
+          profileDefaults: { ...entity.profileMapping.profileDefaults },
+          effectiveSandboxing: { ...entity.profileMapping.effectiveSandboxing },
+          driftItems: entity.profileMapping.driftItems.map((item) => ({ ...item })),
+        }
+      : undefined,
     resourceControls: { ...entity.resourceControls },
     sandboxing: { ...entity.sandboxing },
     status: { ...entity.status },
+    unknownSystemdDirectives: entity.unknownSystemdDirectives?.map((directive) => ({
+      ...directive,
+    })),
+    validation: entity.validation
+      ? {
+          ...entity.validation,
+          errors: entity.validation.errors.map((issue) => ({ ...issue })),
+          warnings: entity.validation.warnings.map((issue) => ({ ...issue })),
+          readonlyReasons: [...entity.validation.readonlyReasons],
+        }
+      : undefined,
   };
 }
 
@@ -300,12 +321,27 @@ export function createFixtureMetadataSource(
         sandboxing: { ...input.sandboxing },
       });
     },
+    async updateManagedEntityMetadata(unitName, input) {
+      return compactMetadataRecord({
+        unitName,
+        description: input.description,
+        workingDirectory: input.workingDirectory,
+        slice: input.slice ?? "sandboxd.slice",
+        sandboxProfile: input.sandboxProfile,
+        resourceControls: { ...input.resourceControls },
+        sandboxing: { ...input.sandboxing },
+      });
+    },
     async getFallbackEntityDetail(unitName, { fixtureName = defaultFixtureName } = {}) {
       const entity = getFixture(fixtureName).find((item) => item.unitName === unitName);
       return entity ? cloneEntity(entity) : null;
     },
     async createFallbackSandboxService(input: CreateSandboxServiceInput) {
       const unitName = input.name.endsWith(".service") ? input.name : `${input.name}.service`;
+      const resolvedSandboxing = {
+        ...getSandboxProfileDefaults(input.sandboxProfile),
+        ...input.sandboxing,
+      };
       const entity: ManagedEntityDetail = {
         kind: "sandbox-service",
         origin: "sandboxd",
@@ -323,7 +359,8 @@ export function createFixtureMetadataSource(
         sandboxProfile: input.sandboxProfile,
         capabilities: createCapabilities("sandboxd", "inactive"),
         resourceControls: { ...input.resourceControls },
-        sandboxing: { ...input.sandboxing },
+        sandboxing: resolvedSandboxing,
+        advancedProperties: input.advancedProperties ? { ...input.advancedProperties } : undefined,
         status: {
           activeState: "inactive",
           subState: "dead",
@@ -333,6 +370,15 @@ export function createFixtureMetadataSource(
 
       store[defaultFixtureName] = [...store[defaultFixtureName], entity];
       return cloneEntity(entity);
+    },
+    async deleteFallbackSandboxService(unitName) {
+      const fixture = store[defaultFixtureName];
+      const next = fixture.filter((entity) => entity.unitName !== unitName);
+      const deleted = next.length !== fixture.length;
+      if (deleted) {
+        store[defaultFixtureName] = next;
+      }
+      return deleted;
     },
     async updateFallbackEntityState(unitName, state) {
       const fixture = store[defaultFixtureName];
@@ -362,6 +408,39 @@ export function createFixtureMetadataSource(
       fixture[index] = next;
       return cloneEntity(next);
     },
+    async updateFallbackSandboxService(unitName, input) {
+      const fixture = store[defaultFixtureName];
+      const index = fixture.findIndex((entity) => entity.unitName === unitName);
+      if (index === -1) {
+        return null;
+      }
+
+      const previous = fixture[index];
+      if (!previous) {
+        return null;
+      }
+
+      const resolvedSandboxing = {
+        ...getSandboxProfileDefaults(input.sandboxProfile),
+        ...input.sandboxing,
+      };
+      const next: ManagedEntityDetail = {
+        ...previous,
+        description: input.description ?? previous.description,
+        slice: input.slice ?? previous.slice ?? "sandboxd.slice",
+        sandboxProfile: input.sandboxProfile,
+        resourceControls: { ...input.resourceControls },
+        sandboxing: resolvedSandboxing,
+        advancedProperties: input.advancedProperties ? { ...input.advancedProperties } : undefined,
+        labels: {
+          ...previous.labels,
+          execStart: input.execStart,
+        },
+      };
+
+      fixture[index] = next;
+      return cloneEntity(next);
+    },
   };
 }
 
@@ -376,7 +455,7 @@ export function parseFixtureName(value: string | undefined): ManagedEntityFixtur
 function compactMetadataRecord(record: {
   description: string | undefined;
   resourceControls: ManagedEntityMetadataRecord["resourceControls"];
-  sandboxProfile: string | undefined;
+  sandboxProfile: ManagedEntityMetadataRecord["sandboxProfile"];
   sandboxing: ManagedEntityMetadataRecord["sandboxing"];
   slice: string;
   unitName: string;

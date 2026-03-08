@@ -5,6 +5,7 @@ import type {
   ManagedEntityDetail,
   ManagedEntitySummary,
   ResourceControls,
+  SandboxProfile,
   Sandboxing,
   UnknownSystemdDirective,
 } from "@sandboxd/core";
@@ -18,7 +19,7 @@ export interface ManagedEntityMetadataRecord {
   description?: string;
   unknownSystemdDirectives?: UnknownSystemdDirective[];
   resourceControls: ResourceControls;
-  sandboxProfile?: string;
+  sandboxProfile?: SandboxProfile;
   sandboxing: Sandboxing;
   slice?: string;
   unitName: string;
@@ -51,5 +52,14 @@ export interface ManagedEntityMetadataSourcePort {
     },
   ): Promise<ManagedEntityDetail | null>;
   createFallbackSandboxService(input: CreateSandboxServiceInput): Promise<ManagedEntityDetail>;
+  deleteFallbackSandboxService(unitName: string): Promise<boolean>;
   updateFallbackEntityState(unitName: string, state: string): Promise<ManagedEntityDetail | null>;
+  updateFallbackSandboxService(
+    unitName: string,
+    input: CreateSandboxServiceInput,
+  ): Promise<ManagedEntityDetail | null>;
+  updateManagedEntityMetadata(
+    unitName: string,
+    input: CreateSandboxServiceInput,
+  ): Promise<ManagedEntityMetadataRecord>;
 }

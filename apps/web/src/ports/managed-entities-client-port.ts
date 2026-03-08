@@ -11,4 +11,9 @@ export interface ManagedEntitiesClientPort {
   stopManagedEntity(unitName: string): Promise<ManagedEntityDetail>;
   restartManagedEntity(unitName: string): Promise<ManagedEntityDetail>;
   createSandboxService(input: CreateSandboxServiceInput): Promise<ManagedEntityDetail>;
+  updateSandboxService(
+    unitName: string,
+    input: CreateSandboxServiceInput,
+  ): Promise<ManagedEntityDetail>;
+  deleteSandboxService(unitName: string): Promise<void>;
 }
