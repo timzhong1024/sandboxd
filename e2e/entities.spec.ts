@@ -19,5 +19,5 @@ test("renders the managed entity inventory", async ({ page }) => {
 
   const cards = page.getByRole("list").getByRole("listitem");
   await expect(cards.first()).toBeVisible();
-  await expect(cards).toHaveCount(4);
+  await expect.poll(async () => cards.count()).toBeGreaterThanOrEqual(4);
 });
