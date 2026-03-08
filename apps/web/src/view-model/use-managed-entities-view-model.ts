@@ -3,7 +3,10 @@ import type {
   ManagedEntityDetail,
   ManagedEntitySummary,
 } from "@sandboxd/core";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+
+const DETAIL_LOADING_DELAY_MS = 120;
+const DETAIL_LOADING_MIN_VISIBLE_MS = 240;
 
 interface UseManagedEntitiesViewModelOptions {
   createSandboxService: (input: CreateSandboxServiceInput) => Promise<ManagedEntityDetail>;
@@ -48,10 +51,21 @@ export function useManagedEntitiesViewModel({
   const [updateError, setUpdateError] = useState<string | null>(null);
   const [createPending, setCreatePending] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
+  const detailRequestIdRef = useRef(0);
+  const detailPendingRef = useRef(false);
+  const detailLoadingDelayRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     void refreshEntities();
   }, [loadManagedEntities]);
+
+  useEffect(() => {
+    return () => {
+      if (detailLoadingDelayRef.current) {
+        clearTimeout(detailLoadingDelayRef.current);
+      }
+    };
+  }, []);
 
   async function refreshEntities(preferredSelection?: string | null) {
     try {
@@ -72,19 +86,69 @@ export function useManagedEntitiesViewModel({
     }
   }
 
+  function setDetailPendingState(next: boolean) {
+    detailPendingRef.current = next;
+    setDetailPending(next);
+  }
+
   async function loadDetail(unitName: string) {
+    const requestId = ++detailRequestIdRef.current;
+    let loadingShownAt = detailPendingRef.current ? Date.now() : null;
+    let shouldClearPending = true;
+
+    if (detailLoadingDelayRef.current) {
+      clearTimeout(detailLoadingDelayRef.current);
+      detailLoadingDelayRef.current = null;
+    }
+
     setSelectedUnitName(unitName);
-    setDetailPending(true);
     setDetailError(null);
+
+    if (!detailPendingRef.current) {
+      detailLoadingDelayRef.current = setTimeout(() => {
+        if (detailRequestIdRef.current !== requestId || detailPendingRef.current) {
+          return;
+        }
+        loadingShownAt = Date.now();
+        setDetailPendingState(true);
+      }, DETAIL_LOADING_DELAY_MS);
+    }
 
     try {
       const loadedDetail = await loadManagedEntity(unitName);
+      if (detailRequestIdRef.current !== requestId) {
+        shouldClearPending = false;
+        return;
+      }
       setDetail(loadedDetail);
     } catch (loadError: unknown) {
+      if (detailRequestIdRef.current !== requestId) {
+        shouldClearPending = false;
+        return;
+      }
       setDetailError(loadError instanceof Error ? loadError.message : "Unknown error");
       setDetail(null);
     } finally {
-      setDetailPending(false);
+      if (detailLoadingDelayRef.current) {
+        clearTimeout(detailLoadingDelayRef.current);
+        detailLoadingDelayRef.current = null;
+      }
+
+      if (shouldClearPending && detailRequestIdRef.current === requestId) {
+        if (loadingShownAt !== null) {
+          const visibleFor = Date.now() - loadingShownAt;
+          const remainingVisibleTime = DETAIL_LOADING_MIN_VISIBLE_MS - visibleFor;
+          if (remainingVisibleTime > 0) {
+            await new Promise((resolve) => {
+              setTimeout(resolve, remainingVisibleTime);
+            });
+          }
+        }
+
+        if (detailRequestIdRef.current === requestId) {
+          setDetailPendingState(false);
+        }
+      }
     }
   }
 

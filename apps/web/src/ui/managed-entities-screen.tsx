@@ -1,17 +1,32 @@
 import type {
+  AdvancedBooleanListMode,
+  AdvancedListMode,
+  AdvancedPropertyGroup,
+  AdvancedPropertyGroupSpec,
+  AdvancedPropertySpec,
   CreateSandboxServiceInput,
   ManagedEntityDetail,
   ManagedEntitySummary,
+  UnknownSystemdDirective,
 } from "@sandboxd/core";
-import { isSandboxdManaged } from "@sandboxd/core";
+import {
+  getSupportedAdvancedPropertyGroupSpec,
+  isSandboxdManaged,
+  supportedAdvancedPropertySpecs,
+} from "@sandboxd/core";
 import {
   Activity,
+  Cpu,
+  ChevronDown,
+  ChevronRight,
   DatabaseZap,
   Layers2,
+  MemoryStick,
   Plus,
   ScanSearch,
   ShieldCheck,
   Wrench,
+  type LucideIcon,
 } from "lucide-react";
 import { type ChangeEvent, type FormEvent, type ReactNode, useMemo, useState } from "react";
 import { Panel } from "../components/ui/panel";
@@ -23,6 +38,7 @@ import {
   EmptyState,
   FilterBar,
   HeroSection,
+  InfoHintIcon,
   InlineHint,
   OverviewRail,
   SectionHeader,
@@ -63,6 +79,8 @@ interface CreateSandboxServiceDraft {
 }
 
 type EntityBadgeState = "active" | "inactive" | "failed" | "unknown";
+type AdvancedPropertiesMap = NonNullable<ManagedEntityDetail["advancedProperties"]>;
+type AdvancedPropertyValue = AdvancedPropertiesMap[keyof AdvancedPropertiesMap];
 
 const initialCreateDraft: CreateSandboxServiceDraft = {
   name: "",
@@ -79,6 +97,31 @@ const initialCreateDraft: CreateSandboxServiceDraft = {
   protectSystem: "full",
   protectHome: false,
 };
+
+const advancedGroupOrder: AdvancedPropertyGroup[] = [
+  "filesystem",
+  "privilege",
+  "isolation",
+  "syscall",
+  "network",
+  "resource",
+  "process",
+];
+
+const advancedGroupSpecs = advancedGroupOrder.reduce<
+  Record<AdvancedPropertyGroup, AdvancedPropertyGroupSpec>
+>(
+  (result, group) => {
+    const spec = getSupportedAdvancedPropertyGroupSpec(group);
+    if (!spec) {
+      throw new TypeError(`Missing advanced property group spec for ${group}`);
+    }
+
+    result[group] = spec;
+    return result;
+  },
+  {} as Record<AdvancedPropertyGroup, AdvancedPropertyGroupSpec>,
+);
 
 function getStateTone(state: string): EntityBadgeState {
   if (state === "active" || state === "running") {
@@ -106,6 +149,30 @@ function getEntityIcon(kind: ManagedEntitySummary["kind"]) {
   }
 
   return ScanSearch;
+}
+
+function getEntityIdentityCopy(entity: ManagedEntitySummary) {
+  const managed = isSandboxdManaged(entity);
+
+  if (managed && entity.kind === "sandbox-service") {
+    return {
+      label: "Sandboxd managed service",
+      description: "Managed directly by sandboxd and backed by a systemd service unit on the host.",
+    };
+  }
+
+  if (managed) {
+    return {
+      label: "Sandboxd managed entity",
+      description:
+        "Owned by sandboxd. The current runtime still surfaces it through the systemd control plane.",
+    };
+  }
+
+  return {
+    label: "External systemd unit",
+    description: "Observed from host systemd inventory but not managed by sandboxd.",
+  };
 }
 
 function getFilterSummary(filter: string) {
@@ -174,6 +241,7 @@ export function ManagedEntitiesScreen({
     managed: sandboxdManagedCount,
     external: externalCount,
   };
+  const [isAdvancedMode, setIsAdvancedMode] = useState(false);
 
   async function handleCreateSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -251,48 +319,60 @@ export function ManagedEntitiesScreen({
           </Panel>
         </OverviewRail>
         {error ? <AlertStrip message={error} /> : null}
-        <section className="grid gap-4 xl:grid-cols-[1.25fr_0.75fr]">
-          <Panel tone="elevated" className="space-y-5">
-            <SectionHeader
-              eyebrow="Inventory"
-              title={filterSummary.title}
-              description={filterSummary.description}
-              meta={
-                <div className="flex items-center gap-3">
-                  <StatusBadge state={filteredEntities.length > 0 ? "active" : "inactive"}>
-                    {filteredEntities.length} visible
-                  </StatusBadge>
-                  <button
-                    type="button"
-                    className="inline-flex items-center gap-2 rounded-full border border-[color:var(--color-border)] bg-black/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-white transition hover:border-[color:var(--color-border-strong)]"
-                    onClick={() => {
-                      setIsCreateOpen((currentValue) => !currentValue);
-                    }}
-                  >
-                    <Plus className="h-3.5 w-3.5" />
-                    Create service
-                  </button>
-                </div>
-              }
-            />
+        <section className="grid gap-4 xl:grid-cols-[1fr_2fr]">
+          <Panel tone="elevated" className="flex h-full flex-col gap-5">
+            <div className="grid gap-4">
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-[color:var(--color-accent)]">
+                  Inventory
+                </p>
+                <h2 className="mt-2 max-w-[14ch] text-2xl font-semibold tracking-[-0.03em] text-white">
+                  {filterSummary.title}
+                </h2>
+                <p className="mt-2 max-w-[30ch] text-sm leading-7 text-[color:var(--color-text-muted)]">
+                  {filterSummary.description}
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-3">
+                <StatusBadge state={filteredEntities.length > 0 ? "active" : "inactive"}>
+                  {filteredEntities.length} visible
+                </StatusBadge>
+                <button
+                  type="button"
+                  className="inline-flex items-center gap-2 rounded-full border border-[color:var(--color-border)] bg-black/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-white transition hover:border-[color:var(--color-border-strong)]"
+                  onClick={() => {
+                    setIsCreateOpen((currentValue) => !currentValue);
+                  }}
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  Create service
+                </button>
+              </div>
+            </div>
             <FilterBar value={filter} onValueChange={setFilter} counts={filterCounts} />
-            {filteredEntities.length === 0 ? (
-              <EmptyState
-                title="No entities in this view"
-                description="The current filter returned no units. Adjust the inventory source or choose a broader view."
+            <div className="flex grow flex-col">
+              {filteredEntities.length === 0 ? (
+                <EmptyState
+                  title="No entities in this view"
+                  description="The current filter returned no units. Adjust the inventory source or choose a broader view."
+                />
+              ) : (
+                <ul className="grid content-start gap-3">
+                  {filteredEntities.map((entity) => (
+                    <EntityCard
+                      key={entity.unitName}
+                      entity={entity}
+                      selected={entity.unitName === selectedUnitName}
+                      onSelect={selectEntity}
+                    />
+                  ))}
+                </ul>
+              )}
+              <div
+                aria-hidden="true"
+                className="mt-4 hidden grow rounded-[20px] border border-dashed border-white/5 bg-[linear-gradient(180deg,rgba(255,255,255,0.015),rgba(255,255,255,0.005))] xl:block"
               />
-            ) : (
-              <ul className="grid gap-3 lg:grid-cols-2">
-                {filteredEntities.map((entity) => (
-                  <EntityCard
-                    key={entity.unitName}
-                    entity={entity}
-                    selected={entity.unitName === selectedUnitName}
-                    onSelect={selectEntity}
-                  />
-                ))}
-              </ul>
-            )}
+            </div>
           </Panel>
           <div className="space-y-4">
             <Panel tone="elevated" className="space-y-5">
@@ -313,6 +393,13 @@ export function ManagedEntitiesScreen({
               ) : detail ? (
                 <>
                   <DetailGrid detail={detail} />
+                  <AdvancedModeSection
+                    detail={detail}
+                    enabled={isAdvancedMode}
+                    onToggle={() => {
+                      setIsAdvancedMode((currentValue) => !currentValue);
+                    }}
+                  />
                   <ActionRow
                     detail={detail}
                     pending={updatePending}
@@ -479,71 +566,65 @@ function EntityCard({
   selected: boolean;
 }) {
   const Icon = getEntityIcon(entity.kind);
-  const managed = isSandboxdManaged(entity);
+  const identity = getEntityIdentityCopy(entity);
+  const permissionToken = getEntityPermissionToken(entity);
+  const resourceTokens = getEntityResourceTokens(entity);
 
   return (
     <li className="list-none">
       <button
         type="button"
-        className={`w-full text-left ${selected ? "ring-1 ring-[color:var(--color-accent)]" : ""}`}
+        className="group w-full text-left"
         onClick={() => {
           void onSelect(entity.unitName);
         }}
       >
-        <Panel
-          density="compact"
-          className="h-full rounded-[22px] border-[color:var(--color-border)] bg-[linear-gradient(180deg,rgba(27,31,32,0.95),rgba(15,18,18,0.97))] transition hover:border-[color:var(--color-border-strong)]"
-        >
-          <div className="flex flex-col gap-4">
-            <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-              <div className="min-w-0">
-                <div className="flex items-center gap-3">
-                  <span className="rounded-[14px] border border-[color:var(--color-border)] bg-white/5 p-2 text-[color:var(--color-accent)]">
-                    <Icon className="h-4 w-4" />
+        <div className="relative rounded-[24px]">
+          {selected ? (
+            <>
+              <div className="pointer-events-none absolute -inset-[3px] rounded-[26px] bg-[radial-gradient(circle_at_88%_14%,rgba(210,252,162,0.42),rgba(210,252,162,0.12)_18%,rgba(210,252,162,0.02)_36%,transparent_56%),radial-gradient(circle_at_86%_16%,rgba(210,252,162,0.18),transparent_38%)] opacity-95 blur-[14px]" />
+              <div className="pointer-events-none absolute -inset-[1px] rounded-[25px] bg-[linear-gradient(180deg,rgba(210,252,162,0.02),rgba(210,252,162,0.01))]" />
+              <div className="pointer-events-none absolute -inset-[1px] rounded-[25px] bg-[linear-gradient(135deg,rgba(210,252,162,0.16),rgba(210,252,162,0.04)_18%,rgba(210,252,162,0.01)_34%,transparent_52%)] opacity-70" />
+            </>
+          ) : null}
+          <Panel
+            density="compact"
+            className="relative h-full rounded-[22px] border-[color:var(--color-border)] bg-[linear-gradient(180deg,rgba(27,31,32,0.95),rgba(15,18,18,0.97))] transition hover:border-[color:var(--color-border-strong)]"
+          >
+            <div className="grid gap-2">
+              <div className="flex items-center gap-2.5">
+                <InlineHint label={identity.label} description={identity.description}>
+                  <span className="rounded-[11px] border border-[color:var(--color-border)] bg-white/5 p-1.5 text-[color:var(--color-accent)] transition hover:border-[color:var(--color-border-strong)]">
+                    <Icon className="h-[1.05rem] w-[1.05rem]" />
                   </span>
-                  <div className="min-w-0">
-                    <h3 className="truncate font-mono text-base text-white sm:text-lg">
-                      {entity.unitName}
-                    </h3>
-                    <p className="mt-1 text-sm text-[color:var(--color-text-muted)]">
-                      {entity.slice ?? "no slice"} / {entity.unitType}
-                    </p>
+                </InlineHint>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="min-w-0">
+                      <h3 className="truncate font-mono text-[1.05rem] leading-none text-white">
+                        {entity.unitName}
+                      </h3>
+                    </div>
+                    <InventoryStateBadge selected={selected} state={entity.state} />
                   </div>
                 </div>
               </div>
-              <div className="flex flex-wrap gap-2">
-                <InlineHint
-                  label="Entity classification"
-                  description="Kind is a UI-facing grouping used for iconography and layout decisions."
-                >
-                  <StatusBadge state="unknown" led={false}>
-                    {entity.kind}
-                  </StatusBadge>
-                </InlineHint>
-                <InlineHint
-                  label={managed ? "Sandboxd origin" : "External origin"}
-                  description={
-                    managed
-                      ? "Owned and managed directly by sandboxd."
-                      : "Observed from system inventory but not managed by sandboxd."
-                  }
-                >
-                  <StatusBadge state={managed ? "active" : "inactive"}>{entity.origin}</StatusBadge>
-                </InlineHint>
+              <div className="border-t border-[color:var(--color-border)]/45 pt-2">
+                <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+                  <PermissionToken token={permissionToken} />
+                  {resourceTokens.map((token) => (
+                    <ResourceToken
+                      key={`${entity.unitName}-${token.label}`}
+                      icon={token.icon}
+                      label={token.label}
+                      value={token.value}
+                    />
+                  ))}
+                </div>
               </div>
             </div>
-            <Separator />
-            <dl className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-              <MetaBlock
-                label="State"
-                value={<StatusBadge state={getStateTone(entity.state)}>{entity.state}</StatusBadge>}
-              />
-              <MetaBlock label="Unit type" value={entity.unitType} />
-              <MetaBlock label="Slice" value={entity.slice ?? "n/a"} />
-              <MetaBlock label="Sandbox profile" value={entity.sandboxProfile ?? "n/a"} />
-            </dl>
-          </div>
-        </Panel>
+          </Panel>
+        </div>
       </button>
     </li>
   );
@@ -591,6 +672,474 @@ function DetailGrid({ detail }: { detail: ManagedEntityDetail }) {
         </Panel>
       </div>
     </div>
+  );
+}
+
+function AdvancedModeSection({
+  detail,
+  enabled,
+  onToggle,
+}: {
+  detail: ManagedEntityDetail;
+  enabled: boolean;
+  onToggle: () => void;
+}) {
+  const groupedSpecs = useMemo(
+    () =>
+      advancedGroupOrder
+        .map((group) => ({
+          group,
+          specs: supportedAdvancedPropertySpecs.filter((spec) => spec.group === group),
+        }))
+        .filter((section) => section.specs.length > 0),
+    [],
+  );
+
+  return (
+    <Panel density="compact" className="space-y-4">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <div className="flex items-center gap-2 text-sm font-medium text-white">
+            <ShieldCheck className="h-4 w-4 text-[color:var(--color-accent)]" />
+            Advanced mode
+          </div>
+          <p className="mt-2 text-sm leading-6 text-[color:var(--color-text-muted)]">
+            Structured systemd property inspection driven by the shared registry. Editing stays
+            disabled until validation and write-path support land.
+          </p>
+        </div>
+        <button
+          type="button"
+          aria-expanded={enabled}
+          className="inline-flex items-center gap-2 self-start rounded-full border border-[color:var(--color-border)] bg-black/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-white transition hover:border-[color:var(--color-border-strong)]"
+          onClick={onToggle}
+        >
+          <ChevronDown className={`h-3.5 w-3.5 transition ${enabled ? "rotate-180" : ""}`} />
+          {enabled ? "Hide advanced" : "Advanced mode"}
+        </button>
+      </div>
+      {enabled ? (
+        <div className="space-y-4">
+          {groupedSpecs.map((section) => (
+            <AdvancedGroupSection
+              key={section.group}
+              detail={detail}
+              group={section.group}
+              specs={section.specs}
+            />
+          ))}
+          <UnknownDirectivesSection directives={detail.unknownSystemdDirectives ?? []} />
+          <div className="flex flex-col gap-3 rounded-[16px] border border-[color:var(--color-border)] bg-black/10 px-4 py-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <div className="text-sm font-medium text-white">Advanced changes</div>
+              <p className="mt-1 text-sm text-[color:var(--color-text-muted)]">
+                Save and Reset stay disabled until advanced validation and write support are ready.
+              </p>
+            </div>
+            <div className="flex items-center gap-3">
+              <button
+                type="button"
+                className="rounded-full border border-[color:var(--color-border)] px-4 py-2 text-sm text-[color:var(--color-text-muted)] disabled:cursor-not-allowed disabled:opacity-45"
+                disabled
+              >
+                Reset
+              </button>
+              <button
+                type="button"
+                className="rounded-full bg-[color:var(--color-accent)] px-4 py-2 text-sm font-semibold text-black disabled:cursor-not-allowed disabled:opacity-45"
+                disabled
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </Panel>
+  );
+}
+
+function AdvancedGroupSection({
+  detail,
+  group,
+  specs,
+}: {
+  detail: ManagedEntityDetail;
+  group: AdvancedPropertyGroup;
+  specs: AdvancedPropertySpec[];
+}) {
+  const openByDefault = specs.some((spec) => spec.level === "recommended");
+
+  return (
+    <details
+      open={openByDefault}
+      className="group relative overflow-hidden rounded-[22px] border border-[color:var(--color-border)] bg-[linear-gradient(180deg,rgba(9,12,13,0.88),rgba(7,10,11,0.94))]"
+    >
+      <div className="pointer-events-none absolute inset-0 z-0 rounded-[22px] opacity-0 transition duration-300 group-hover:opacity-100">
+        <div className="absolute inset-0 rounded-[22px] bg-[linear-gradient(135deg,rgba(210,252,162,0.22),rgba(210,252,162,0.06)_18%,transparent_42%,transparent_58%,rgba(210,252,162,0.05)_82%,rgba(210,252,162,0.18))]" />
+        <div className="absolute inset-px rounded-[21px] bg-[linear-gradient(180deg,rgba(9,12,13,0.96),rgba(7,10,11,0.98))]" />
+      </div>
+      <summary className="relative z-10 flex cursor-pointer list-none items-start justify-between gap-3 px-6 py-5">
+        <div>
+          <div className="flex items-center gap-2">
+            <div className="text-xl font-semibold tracking-[-0.03em] text-white">
+              {advancedGroupSpecs[group].title}
+            </div>
+            <InfoHintIcon
+              label={advancedGroupSpecs[group].title}
+              description={advancedGroupSpecs[group].description}
+            />
+          </div>
+          <div className="mt-2 text-sm text-[color:var(--color-text-muted)] group-open:hidden">
+            {specs.length} structured properties
+          </div>
+        </div>
+        <ChevronDown className="mt-1 h-4 w-4 shrink-0 text-[color:var(--color-text-soft)]/65 transition group-open:rotate-180" />
+      </summary>
+      <div className="relative z-10 grid grid-cols-1 gap-x-8 border-t border-[color:var(--color-border)] px-6 py-2 lg:grid-cols-2 xl:grid-cols-1 2xl:grid-cols-2">
+        {specs.map((spec) => (
+          <AdvancedPropertyField
+            key={spec.key}
+            propertyValue={detail.advancedProperties?.[spec.key]}
+            spec={spec}
+          />
+        ))}
+      </div>
+    </details>
+  );
+}
+
+function AdvancedPropertyField({
+  propertyValue,
+  spec,
+}: {
+  propertyValue: AdvancedPropertyValue | undefined;
+  spec: AdvancedPropertySpec;
+}) {
+  const entries = normalizePropertyEntries(propertyValue);
+  const parsedEntries = entries.filter((entry) => entry.parsed !== undefined);
+  const rawEntries = entries.filter((entry) => entry.raw !== undefined);
+  const supportsExpandedDetail =
+    spec.valueType === "path-list" ||
+    spec.valueType === "environment" ||
+    spec.valueType === "mode-list" ||
+    rawEntries.length > 0;
+
+  if (!supportsExpandedDetail) {
+    return (
+      <div className="group border-b border-[color:var(--color-border)]/60 py-3 last:border-b-0">
+        <div className="-mx-2 grid grid-cols-[minmax(0,1fr)_minmax(160px,280px)] items-center gap-3 rounded-[12px] px-2 py-1.5 transition hover:bg-white/[0.025]">
+          <div className="min-w-0">
+            <div className="inline-flex max-w-full items-center gap-2 align-middle">
+              <span
+                className={`text-sm leading-tight font-medium text-white transition ${getPropertyLevelHoverTextClass(spec.level)}`}
+              >
+                {spec.title}
+              </span>
+              <InfoHintIcon
+                subtle
+                label={`${spec.title} · ${getPropertyLevelLabel(spec.level)}`}
+                description={`${spec.description} ${getPropertyLevelDescription(spec.level)}`}
+                tone={getPropertyLevelTone(spec.level)}
+              />
+            </div>
+          </div>
+          <div className="min-w-0">
+            <ReadonlyPreviewSurface
+              expandable={false}
+              value={formatCollapsedPropertyPreview(parsedEntries, spec) || "n/a"}
+            />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <details className="group border-b border-[color:var(--color-border)]/60 py-3 last:border-b-0">
+      <summary className="-mx-2 grid cursor-pointer list-none grid-cols-[minmax(0,1fr)_minmax(160px,280px)] items-center gap-3 rounded-[12px] px-2 py-1.5 transition hover:bg-white/[0.025]">
+        <div className="min-w-0">
+          <div className="inline-flex max-w-full items-center gap-2 align-middle">
+            <span
+              className={`text-sm leading-tight font-medium text-white transition ${getPropertyLevelHoverTextClass(spec.level)}`}
+            >
+              {spec.title}
+            </span>
+            <InfoHintIcon
+              subtle
+              label={`${spec.title} · ${getPropertyLevelLabel(spec.level)}`}
+              description={`${spec.description} ${getPropertyLevelDescription(spec.level)}`}
+              tone={getPropertyLevelTone(spec.level)}
+            />
+            {rawEntries.length > 0 ? (
+              <span className="shrink-0 text-[11px] uppercase tracking-[0.14em] text-[color:var(--color-state-failed)]/85">
+                raw
+              </span>
+            ) : null}
+          </div>
+        </div>
+        <div className="min-w-0">
+          <ReadonlyPreviewSurface expandable value={formatPropertyPreview(parsedEntries, spec)} />
+        </div>
+      </summary>
+      <div className="mt-3 grid gap-2 border-t border-[color:var(--color-border)]/60 pt-3">
+        <div className="rounded-[14px] border border-[color:var(--color-border)]/80 bg-white/[0.025] px-3 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.02)]">
+          <StructuredPropertyControl
+            id={`advanced-${spec.key}`}
+            parsedEntries={parsedEntries}
+            spec={spec}
+          />
+        </div>
+        {rawEntries.length > 0 ? (
+          <details className="rounded-[12px] border border-amber-300/20 bg-amber-300/8 px-3 py-2">
+            <summary className="cursor-pointer list-none text-xs font-medium text-[color:var(--color-state-failed)]">
+              {rawEntries.length} raw entr{rawEntries.length === 1 ? "y" : "ies"}
+            </summary>
+            <div className="mt-2 grid gap-2">
+              {rawEntries.map((entry, index) => (
+                <label key={`${spec.key}-raw-${index}`} className="grid gap-1 text-sm">
+                  <span className="text-xs text-[color:var(--color-text-soft)]">
+                    Raw value {index + 1}
+                  </span>
+                  <textarea
+                    className="min-h-14 rounded-[12px] border border-amber-300/25 bg-black/10 px-3 py-2 font-mono text-sm text-white outline-none"
+                    disabled
+                    rows={2}
+                    value={entry.raw ?? ""}
+                  />
+                </label>
+              ))}
+            </div>
+          </details>
+        ) : null}
+      </div>
+    </details>
+  );
+}
+
+function StructuredPropertyControl({
+  id,
+  parsedEntries,
+  spec,
+}: {
+  id: string;
+  parsedEntries: Array<{ parsed?: unknown; raw?: string }>;
+  spec: AdvancedPropertySpec;
+}) {
+  function wrapWithInspectOnly(control: ReactNode) {
+    return <div className="min-w-0">{control}</div>;
+  }
+
+  if (spec.valueType === "boolean") {
+    return wrapWithInspectOnly(
+      <CheckboxField
+        checked={Boolean(parsedEntries[0]?.parsed)}
+        disabled
+        hideLabel
+        label={`${spec.title} value`}
+        name={id}
+        onChange={() => {}}
+      />,
+    );
+  }
+
+  if (spec.valueType === "enum") {
+    return wrapWithInspectOnly(
+      <SelectField
+        compact
+        disabled
+        hideLabel
+        label={spec.title}
+        name={id}
+        onChange={() => {}}
+        options={buildEnumOptions(spec)}
+        value={formatScalarParsedValue(parsedEntries[0]?.parsed, spec) ?? ""}
+      />,
+    );
+  }
+
+  if (spec.valueType === "path") {
+    return wrapWithInspectOnly(
+      <FormField
+        compact
+        disabled
+        hideLabel
+        label={spec.title}
+        name={id}
+        onChange={() => {}}
+        value={formatScalarParsedValue(parsedEntries[0]?.parsed, spec) ?? ""}
+      />,
+    );
+  }
+
+  if (
+    spec.valueType === "cpu-weight" ||
+    spec.valueType === "size-limit" ||
+    spec.valueType === "count-limit"
+  ) {
+    return wrapWithInspectOnly(
+      <CompactValue value={formatScalarParsedValue(parsedEntries[0]?.parsed, spec) || "n/a"} />,
+    );
+  }
+
+  if (spec.valueType === "path-list") {
+    const values = parsedEntries.flatMap((entry) =>
+      Array.isArray(entry.parsed) ? entry.parsed : [],
+    );
+    return wrapWithInspectOnly(
+      <TextareaField compact disabled hideLabel label={spec.title} value={values.join("\n")} />,
+    );
+  }
+
+  if (spec.valueType === "environment") {
+    const mergedEnvironment = parsedEntries.reduce<Record<string, string>>((result, entry) => {
+      if (entry.parsed && typeof entry.parsed === "object" && !Array.isArray(entry.parsed)) {
+        Object.assign(result, entry.parsed as Record<string, string>);
+      }
+
+      return result;
+    }, {});
+    return wrapWithInspectOnly(
+      <TextareaField
+        compact
+        disabled
+        hideLabel
+        label={spec.title}
+        value={Object.entries(mergedEnvironment)
+          .map(([key, value]) => `${key}=${value}`)
+          .join("\n")}
+      />,
+    );
+  }
+
+  if (spec.valueType === "mode-list") {
+    return wrapWithInspectOnly(
+      <div className="grid gap-3">
+        {parsedEntries.length > 0 ? (
+          parsedEntries.map((entry, index) => (
+            <div
+              key={`${spec.key}-mode-${index}`}
+              className="grid gap-2 sm:grid-cols-[150px_minmax(0,1fr)]"
+            >
+              <SelectField
+                compact
+                disabled
+                hideLabel
+                label={`${spec.title} mode ${index + 1}`}
+                name={`${id}-mode-${index}`}
+                onChange={() => {}}
+                options={buildModeOptions(spec)}
+                value={formatModeValue(entry.parsed)}
+              />
+              <TextareaField
+                compact
+                disabled
+                hideLabel
+                label={`${spec.title} values ${index + 1}`}
+                value={formatModeTokens(entry.parsed)}
+              />
+            </div>
+          ))
+        ) : (
+          <TextareaField compact disabled hideLabel label={spec.title} value="" />
+        )}
+      </div>,
+    );
+  }
+
+  return wrapWithInspectOnly(
+    <TextareaField compact disabled hideLabel label={spec.title} value="" />,
+  );
+}
+
+function CompactValue({ subdued = false, value }: { subdued?: boolean; value: string }) {
+  return (
+    <div
+      className={`truncate rounded-[12px] border border-[color:var(--color-border)] px-3 py-1.5 text-sm ${
+        subdued ? "bg-black/5 text-[color:var(--color-text)]/80" : "bg-black/10 text-white"
+      }`}
+    >
+      {value}
+    </div>
+  );
+}
+
+function ReadonlyPreviewSurface({ expandable, value }: { expandable: boolean; value: string }) {
+  return (
+    <div className="group-open:opacity-60">
+      <div
+        className={`flex min-w-0 items-center justify-end gap-3 px-0 py-0.5 text-right transition ${
+          expandable ? "group-hover:text-white" : ""
+        }`}
+      >
+        <span className="min-w-0 max-w-[240px] truncate text-sm text-white/92">{value}</span>
+        <ReadonlyInlineMeta />
+        {expandable ? (
+          <ChevronRight className="h-4 w-4 shrink-0 text-[color:var(--color-text-soft)]/65 transition group-open:rotate-90" />
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function ReadonlyInlineMeta() {
+  return (
+    <InlineHint
+      label="Inspect only"
+      description="sandboxd can inspect this property. Expandable properties open a detailed read-only view below."
+    >
+      <span className="cursor-help whitespace-nowrap text-[10px] uppercase tracking-[0.14em] text-[color:var(--color-text-soft)]/58">
+        read-only
+      </span>
+    </InlineHint>
+  );
+}
+
+function UnknownDirectivesSection({ directives }: { directives: UnknownSystemdDirective[] }) {
+  return (
+    <details className="rounded-[18px] border border-[color:var(--color-border)] bg-black/10">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-4 py-3">
+        <div>
+          <div className="text-sm font-medium text-white">Unsupported / raw directives</div>
+          <div className="mt-1 text-xs text-[color:var(--color-text-muted)]">
+            Detected in unit files, not yet available for structured editing.
+          </div>
+        </div>
+        <StatusBadge state={directives.length > 0 ? "failed" : "inactive"} led={false}>
+          {directives.length}
+        </StatusBadge>
+      </summary>
+      <div className="border-t border-[color:var(--color-border)] px-4 py-4">
+        <p className="text-sm leading-6 text-[color:var(--color-text-muted)]">
+          Detected directives stay visible here until sandboxd can structure and validate them. This
+          means sandboxd has not fully taken over interactive editing for these settings yet.
+        </p>
+        {directives.length === 0 ? (
+          <p className="mt-3 text-sm text-[color:var(--color-text-soft)]">
+            No unsupported directives detected.
+          </p>
+        ) : (
+          <div className="mt-4 grid gap-3">
+            {directives.map((directive, index) => (
+              <div
+                key={`${directive.key}-${directive.source}-${index}`}
+                className="rounded-[14px] border border-[color:var(--color-border)] bg-[color:var(--color-panel-muted)] px-4 py-3"
+              >
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-mono text-sm text-white">{directive.key}</span>
+                  <StatusBadge state="failed" led={false}>
+                    {directive.source}
+                  </StatusBadge>
+                </div>
+                <p className="mt-2 font-mono text-sm text-[color:var(--color-text-muted)]">
+                  {directive.value}
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </details>
   );
 }
 
@@ -662,6 +1211,181 @@ function MetaBlock({ label, value }: { label: string; value: ReactNode }) {
   );
 }
 
+function InventoryStateBadge({ selected, state }: { selected?: boolean; state: string }) {
+  return (
+    <InlineHint label="State" description={state}>
+      <span
+        className={`inline-flex rounded-full ${
+          selected
+            ? "bg-[radial-gradient(circle_at_34%_34%,rgba(210,252,162,0.24),rgba(210,252,162,0.13)_24%,rgba(210,252,162,0.05)_50%,transparent_76%)] p-[1px] shadow-[0_0_18px_rgba(210,252,162,0.16)]"
+            : "p-[1px] group-hover:bg-[radial-gradient(circle_at_34%_34%,rgba(210,252,162,0.12),rgba(210,252,162,0.06)_28%,rgba(210,252,162,0.02)_54%,transparent_78%)] group-hover:shadow-[0_0_12px_rgba(210,252,162,0.08)]"
+        }`}
+        style={{
+          transition:
+            "background-image 220ms ease, box-shadow 220ms ease, opacity 220ms ease, filter 220ms ease",
+        }}
+      >
+        <StatusBadge
+          state={getStateTone(state)}
+          className={`min-w-0 justify-center px-1.5 ${
+            selected
+              ? "opacity-100 shadow-[inset_0_1px_0_rgba(210,252,162,0.12)]"
+              : "opacity-70 group-hover:opacity-90 group-hover:shadow-[inset_0_1px_0_rgba(210,252,162,0.08)]"
+          }`}
+          style={{
+            transition: "opacity 220ms ease, box-shadow 220ms ease, filter 220ms ease",
+          }}
+        >
+          <span className="sr-only">{state}</span>
+        </StatusBadge>
+      </span>
+    </InlineHint>
+  );
+}
+
+function PermissionToken({
+  token,
+}: {
+  token: {
+    description: string;
+    label: string;
+    tone: "active" | "inactive" | "unknown";
+  };
+}) {
+  return (
+    <InlineHint label="Sandbox posture" description={token.description}>
+      <span className="inline-flex items-center gap-1 rounded-full bg-white/[0.035] px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-[0.14em] text-white/70">
+        <ShieldCheck
+          className={`h-3 w-3 ${
+            token.tone === "active"
+              ? "text-[#a9c18f]/74"
+              : token.tone === "unknown"
+                ? "text-[#93a8c0]/66"
+                : "text-[#8f99a3]/58"
+          }`}
+        />
+        {token.label}
+      </span>
+    </InlineHint>
+  );
+}
+
+function ResourceToken({
+  icon: Icon,
+  label,
+  value,
+}: {
+  icon: LucideIcon;
+  label: string;
+  value: string;
+}) {
+  return (
+    <InlineHint label={label} description={value}>
+      <span className="inline-flex items-center gap-1 text-[11px] font-medium leading-none text-white/72">
+        <span className="flex h-3 w-3 shrink-0 items-center justify-center">
+          <Icon
+            className={`h-2.5 w-2.5 text-white/50 ${
+              label === "MemoryMax"
+                ? "translate-y-px"
+                : label === "CPUWeight"
+                  ? "h-[9px] w-[9px] translate-y-[0.5px]"
+                  : ""
+            }`}
+          />
+        </span>
+        <span className="translate-y-[0.5px] tabular-nums tracking-[0.01em]">{value}</span>
+      </span>
+    </InlineHint>
+  );
+}
+
+function getEntityPermissionToken(entity: ManagedEntitySummary) {
+  if (entity.sandboxProfile) {
+    return {
+      label: entity.sandboxProfile,
+      tone: "active" as const,
+      description: `Sandbox profile mode. Current profile: ${entity.sandboxProfile}.`,
+    };
+  }
+
+  const sandboxing = entity.sandboxing ?? {};
+  let score = 0;
+
+  if (sandboxing.noNewPrivileges) {
+    score += 1;
+  }
+  if (sandboxing.privateTmp) {
+    score += 1;
+  }
+  if (
+    sandboxing.protectSystem === "full" ||
+    sandboxing.protectSystem === "strict" ||
+    sandboxing.protectSystem === "yes"
+  ) {
+    score += 1;
+  }
+  if (sandboxing.protectHome) {
+    score += 1;
+  }
+
+  if (score >= 4) {
+    return {
+      label: "strong",
+      tone: "active" as const,
+      description:
+        "Lightweight systemd sandbox posture estimate based on NoNewPrivileges, PrivateTmp, ProtectSystem, and ProtectHome.",
+    };
+  }
+
+  if (score >= 2) {
+    return {
+      label: "moderate",
+      tone: "unknown" as const,
+      description:
+        "Lightweight systemd sandbox posture estimate based on NoNewPrivileges, PrivateTmp, ProtectSystem, and ProtectHome.",
+    };
+  }
+
+  return {
+    label: "weak",
+    tone: "inactive" as const,
+    description: "Lightweight systemd sandbox posture estimate. This is not a full security audit.",
+  };
+}
+
+function getEntityResourceTokens(entity: ManagedEntitySummary) {
+  const tokens: Array<{ icon: LucideIcon; label: string; value: string }> = [];
+  const resourceControls = entity.resourceControls ?? {};
+
+  if (resourceControls.cpuWeight) {
+    tokens.push({
+      icon: Cpu,
+      label: "CPUWeight",
+      value: formatCpuWeightSummary(resourceControls.cpuWeight),
+    });
+  }
+
+  if (resourceControls.memoryMax) {
+    tokens.push({
+      icon: MemoryStick,
+      label: "MemoryMax",
+      value: resourceControls.memoryMax,
+    });
+  }
+
+  return tokens.slice(0, 2);
+}
+
+function formatCpuWeightSummary(value: string) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return value;
+  }
+
+  const normalized = parsed / 100;
+  return `${Number.isInteger(normalized) ? normalized.toFixed(0) : normalized.toFixed(1).replace(/\\.0$/, "")}c`;
+}
+
 function DefinitionLine({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center justify-between gap-4 text-sm">
@@ -672,11 +1396,17 @@ function DefinitionLine({ label, value }: { label: string; value: string }) {
 }
 
 function FormField({
+  compact = false,
+  disabled = false,
+  hideLabel = false,
   label,
   name,
   onChange,
   value,
 }: {
+  compact?: boolean;
+  disabled?: boolean;
+  hideLabel?: boolean;
   label: string;
   name: string;
   onChange: (
@@ -686,9 +1416,11 @@ function FormField({
 }) {
   return (
     <label className="grid gap-2 text-sm">
-      <span className="text-[color:var(--color-text-soft)]">{label}</span>
+      {hideLabel ? null : <span className="text-[color:var(--color-text-soft)]">{label}</span>}
       <input
-        className="rounded-[14px] border border-[color:var(--color-border)] bg-black/10 px-3 py-2 text-white outline-none focus:border-[color:var(--color-border-strong)]"
+        aria-label={label}
+        className={`rounded-[12px] border border-[color:var(--color-border)] bg-black/10 px-3 text-white outline-none focus:border-[color:var(--color-border-strong)] disabled:cursor-not-allowed disabled:opacity-60 ${compact ? "py-1.5 text-sm" : "py-2"}`}
+        disabled={disabled}
         name={name}
         value={value}
         onChange={onChange}
@@ -698,12 +1430,18 @@ function FormField({
 }
 
 function SelectField({
+  compact = false,
+  disabled = false,
+  hideLabel = false,
   label,
   name,
   onChange,
   options,
   value,
 }: {
+  compact?: boolean;
+  disabled?: boolean;
+  hideLabel?: boolean;
   label: string;
   name: string;
   onChange: (
@@ -714,9 +1452,11 @@ function SelectField({
 }) {
   return (
     <label className="grid gap-2 text-sm">
-      <span className="text-[color:var(--color-text-soft)]">{label}</span>
+      {hideLabel ? null : <span className="text-[color:var(--color-text-soft)]">{label}</span>}
       <select
-        className="rounded-[14px] border border-[color:var(--color-border)] bg-black/10 px-3 py-2 text-white outline-none focus:border-[color:var(--color-border-strong)]"
+        aria-label={label}
+        className={`rounded-[12px] border border-[color:var(--color-border)] bg-black/10 px-3 text-white outline-none focus:border-[color:var(--color-border-strong)] disabled:cursor-not-allowed disabled:opacity-60 ${compact ? "py-1.5 text-sm" : "py-2"}`}
+        disabled={disabled}
         name={name}
         value={value}
         onChange={onChange}
@@ -733,11 +1473,17 @@ function SelectField({
 
 function CheckboxField({
   checked,
+  compact = false,
+  disabled = false,
+  hideLabel = false,
   label,
   name,
   onChange,
 }: {
   checked: boolean;
+  compact?: boolean;
+  disabled?: boolean;
+  hideLabel?: boolean;
   label: string;
   name: string;
   onChange: (
@@ -745,11 +1491,96 @@ function CheckboxField({
   ) => void;
 }) {
   return (
-    <label className="flex items-center gap-3 rounded-[14px] border border-[color:var(--color-border)] bg-black/10 px-3 py-2 text-sm text-white">
-      <input checked={checked} name={name} type="checkbox" onChange={onChange} />
-      {label}
+    <label
+      className={`flex items-center gap-3 rounded-[12px] border border-[color:var(--color-border)] bg-black/10 px-3 text-sm text-white disabled:opacity-60 ${compact ? "py-1.5" : "py-2"}`}
+    >
+      <input
+        aria-label={label}
+        checked={checked}
+        disabled={disabled}
+        name={name}
+        type="checkbox"
+        onChange={onChange}
+      />
+      {hideLabel ? null : label}
     </label>
   );
+}
+
+function TextareaField({
+  compact = false,
+  disabled = false,
+  hideLabel = false,
+  label,
+  value,
+}: {
+  compact?: boolean;
+  disabled?: boolean;
+  hideLabel?: boolean;
+  label: string;
+  value: string;
+}) {
+  return (
+    <label className="grid gap-2 text-sm">
+      {hideLabel ? null : <span className="text-[color:var(--color-text-soft)]">{label}</span>}
+      <textarea
+        aria-label={label}
+        className={`rounded-[12px] border border-[color:var(--color-border)] bg-black/10 px-3 py-2 font-mono text-sm text-white outline-none focus:border-[color:var(--color-border-strong)] disabled:cursor-not-allowed disabled:opacity-60 ${compact ? "min-h-14" : "min-h-24"}`}
+        disabled={disabled}
+        rows={compact ? 2 : 4}
+        value={value}
+        readOnly
+      />
+    </label>
+  );
+}
+
+function getPropertyLevelLabel(level: AdvancedPropertySpec["level"]) {
+  if (level === "recommended") {
+    return "recommended";
+  }
+
+  if (level === "advanced") {
+    return "advanced";
+  }
+
+  return "expert";
+}
+
+function getPropertyLevelDescription(level: AdvancedPropertySpec["level"]) {
+  if (level === "recommended") {
+    return "Recommended for most managed services.";
+  }
+
+  if (level === "advanced") {
+    return "Useful for tighter hardening when the service behavior is well understood.";
+  }
+
+  return "Expert-level setting that usually needs careful validation before enabling.";
+}
+
+function getPropertyLevelTone(level: AdvancedPropertySpec["level"]) {
+  if (level === "recommended") {
+    return "active" as const;
+  }
+
+  if (level === "advanced") {
+    return "unknown" as const;
+  }
+
+  return "failed" as const;
+}
+
+function getPropertyLevelHoverTextClass(level: AdvancedPropertySpec["level"]) {
+  if (level === "recommended") {
+    return "group-hover:text-[color:var(--color-state-active)]/92";
+  }
+
+  if (level === "advanced") {
+    return "group-hover:text-[color:var(--color-state-unknown)]/92";
+  }
+
+  return "group-hover:text-[color:var(--color-state-failed)]/92";
 }
 
 function createInputFromDraft(draft: CreateSandboxServiceDraft): CreateSandboxServiceInput {
@@ -780,4 +1611,187 @@ function formatBoolean(value: boolean | undefined) {
   }
 
   return value ? "yes" : "no";
+}
+
+function buildEnumOptions(spec: AdvancedPropertySpec) {
+  if (spec.key === "ProtectSystem") {
+    return [
+      { label: "yes", value: "yes" },
+      { label: "full", value: "full" },
+      { label: "strict", value: "strict" },
+      { label: "no", value: "no" },
+    ];
+  }
+
+  if (spec.key === "ProtectHome") {
+    return [
+      { label: "yes", value: "yes" },
+      { label: "read-only", value: "read-only" },
+      { label: "tmpfs", value: "tmpfs" },
+      { label: "no", value: "no" },
+    ];
+  }
+
+  if (spec.key === "PrivateTmp") {
+    return [
+      { label: "yes", value: "yes" },
+      { label: "disconnected", value: "disconnected" },
+      { label: "no", value: "no" },
+    ];
+  }
+
+  return [{ label: "n/a", value: "" }];
+}
+
+function buildModeOptions(spec: AdvancedPropertySpec) {
+  return (spec.supportedModes ?? ["allow", "deny", "reset"]).map((mode) => ({
+    label: mode,
+    value: mode,
+  }));
+}
+
+function normalizePropertyEntries(
+  propertyValue: AdvancedPropertyValue | undefined,
+): Array<{ parsed?: unknown; raw?: string }> {
+  if (!propertyValue) {
+    return [];
+  }
+
+  if (Array.isArray(propertyValue)) {
+    return propertyValue as Array<{ parsed?: unknown; raw?: string }>;
+  }
+
+  return [propertyValue as { parsed?: unknown; raw?: string }];
+}
+
+function formatScalarParsedValue(parsed: unknown, spec: AdvancedPropertySpec) {
+  if (parsed === undefined) {
+    return "";
+  }
+
+  if (typeof parsed === "boolean") {
+    return parsed ? "yes" : "no";
+  }
+
+  if (typeof parsed === "string") {
+    return parsed;
+  }
+
+  if (spec.valueType === "cpu-weight" && parsed && typeof parsed === "object") {
+    const value = parsed as { kind?: string; value?: number };
+    return value.kind === "idle" ? "idle" : value.value !== undefined ? String(value.value) : "";
+  }
+
+  if (
+    (spec.valueType === "size-limit" || spec.valueType === "count-limit") &&
+    parsed &&
+    typeof parsed === "object"
+  ) {
+    const value = parsed as { kind?: string; value?: string | number };
+    if (value.kind === "infinity") {
+      return "infinity";
+    }
+
+    if (value.kind === "percentage") {
+      return `${value.value ?? ""}%`;
+    }
+
+    return value.value !== undefined ? String(value.value) : "";
+  }
+
+  return "";
+}
+
+function formatModeValue(parsed: unknown) {
+  if (!parsed || typeof parsed !== "object") {
+    return "";
+  }
+
+  return (parsed as { mode?: string }).mode ?? "";
+}
+
+function formatModeTokens(parsed: unknown) {
+  if (!parsed || typeof parsed !== "object") {
+    return "";
+  }
+
+  const modeValue = parsed as AdvancedListMode | AdvancedBooleanListMode;
+  if (modeValue.mode === "reset") {
+    return "";
+  }
+
+  if (modeValue.mode === "boolean") {
+    return modeValue.value ? "yes" : "no";
+  }
+
+  return modeValue.values.join("\n");
+}
+
+function formatModeSummary(parsed: unknown) {
+  if (!parsed || typeof parsed !== "object") {
+    return "";
+  }
+
+  const modeValue = parsed as AdvancedListMode | AdvancedBooleanListMode;
+  if (modeValue.mode === "reset") {
+    return "reset";
+  }
+
+  if (modeValue.mode === "boolean") {
+    return modeValue.value ? "boolean · yes" : "boolean · no";
+  }
+
+  return `${modeValue.mode} · ${modeValue.values.length} values`;
+}
+
+function formatPropertyPreview(
+  parsedEntries: Array<{ parsed?: unknown; raw?: string }>,
+  spec: AdvancedPropertySpec,
+) {
+  if (spec.valueType === "path-list") {
+    const values = parsedEntries.flatMap((entry) =>
+      Array.isArray(entry.parsed) ? entry.parsed : [],
+    );
+    return values.length > 0 ? values.join(", ") : "n/a";
+  }
+
+  if (spec.valueType === "environment") {
+    const mergedEnvironment = parsedEntries.reduce<Record<string, string>>((result, entry) => {
+      if (entry.parsed && typeof entry.parsed === "object" && !Array.isArray(entry.parsed)) {
+        Object.assign(result, entry.parsed as Record<string, string>);
+      }
+      return result;
+    }, {});
+
+    const pairs = Object.entries(mergedEnvironment).map(([key, value]) => `${key}=${value}`);
+    return pairs.length > 0 ? pairs.join(", ") : "n/a";
+  }
+
+  if (spec.valueType === "mode-list") {
+    const summaries = parsedEntries.map((entry) => formatModeSummary(entry.parsed)).filter(Boolean);
+    return summaries.length > 0 ? summaries.join(" | ") : "n/a";
+  }
+
+  return "n/a";
+}
+
+function formatCollapsedPropertyPreview(
+  parsedEntries: Array<{ parsed?: unknown; raw?: string }>,
+  spec: AdvancedPropertySpec,
+) {
+  if (spec.valueType === "boolean") {
+    return formatBoolean(parsedEntries[0]?.parsed as boolean | undefined);
+  }
+
+  if (
+    spec.valueType === "enum" ||
+    spec.valueType === "path" ||
+    spec.valueType === "cpu-weight" ||
+    spec.valueType === "size-limit" ||
+    spec.valueType === "count-limit"
+  ) {
+    return formatScalarParsedValue(parsedEntries[0]?.parsed, spec) || "n/a";
+  }
+
+  return formatPropertyPreview(parsedEntries, spec);
 }

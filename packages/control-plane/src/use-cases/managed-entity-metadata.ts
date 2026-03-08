@@ -20,6 +20,14 @@ export function mergeSummaryWithMetadata(
     slice: metadata.slice ?? summary.slice,
     description: metadata.description ?? summary.description,
     sandboxProfile: metadata.sandboxProfile ?? summary.sandboxProfile,
+    resourceControls: {
+      ...summary.resourceControls,
+      ...metadata.resourceControls,
+    },
+    sandboxing: {
+      ...summary.sandboxing,
+      ...metadata.sandboxing,
+    },
     capabilities: getManagedEntityCapabilities({
       origin: "sandboxd",
       state: summary.state,
@@ -79,6 +87,8 @@ export function createSummaryFromMetadata(
     slice: metadata.slice,
     description: metadata.description ?? options.description,
     sandboxProfile: metadata.sandboxProfile,
+    resourceControls: { ...metadata.resourceControls },
+    sandboxing: { ...metadata.sandboxing },
     labels: {},
     capabilities: getManagedEntityCapabilities({
       origin: "sandboxd",

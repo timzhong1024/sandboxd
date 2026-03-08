@@ -5,8 +5,38 @@ test("returns the mixed fallback fixture by default", async () => {
   const source = createFixtureMetadataSource();
 
   await expect(source.listFallbackEntitySummaries()).resolves.toMatchObject([
-    { unitName: "docker.service" },
-    { unitName: "lab-api.service" },
+    {
+      unitName: "docker.service",
+      resourceControls: {
+        cpuWeight: "150",
+        memoryMax: "1G",
+      },
+    },
+    {
+      unitName: "lab-api.service",
+      sandboxProfile: "strict",
+      resourceControls: {
+        cpuWeight: "200",
+        memoryMax: "512M",
+      },
+    },
+    {
+      unitName: "lab-worker.service",
+      sandboxProfile: "baseline",
+      resourceControls: {
+        cpuWeight: "350",
+        memoryMax: "2G",
+      },
+    },
+    {
+      unitName: "lab-batch.service",
+      state: "failed",
+      sandboxProfile: "strict",
+      resourceControls: {
+        cpuWeight: "120",
+        memoryMax: "768M",
+      },
+    },
   ]);
 });
 

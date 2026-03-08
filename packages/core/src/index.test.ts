@@ -1,5 +1,6 @@
 import { expect, test } from "vitest";
 import {
+  getSupportedAdvancedPropertyGroupSpec,
   getSupportedAdvancedPropertySpec,
   getManagedEntityCapabilities,
   parseAdvancedPropertyDirective,
@@ -477,5 +478,8 @@ test("exposes the first-batch advanced property registry", () => {
   expect(getSupportedAdvancedPropertySpec("RestrictNamespaces")).toMatchObject({
     supportedModes: ["allow", "deny", "reset", "boolean"],
     valueType: "mode-list",
+  });
+  expect(getSupportedAdvancedPropertyGroupSpec("filesystem")).toMatchObject({
+    title: "Filesystem",
   });
 });
