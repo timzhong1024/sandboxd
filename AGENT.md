@@ -187,6 +187,17 @@ V2 高级模式的当前默认约束：
   - `merge`：只处理同 key 多次出现时怎么折叠
   - `validation / normalization`：只处理 sibling 依赖、隐式效果、warning、profile merge、drift
 - 后续如果遇到“这个属性能 parse，但组合起来不合理”的情况，优先补 `validation / normalization`，不要反手把语义规则塞回单属性 parser
+- WebUI 的 hover 高亮默认采用统一视觉语言：
+  - 有“电源按钮 / 状态灯”语义的卡片：
+    - 默认未选中态为最暗
+    - hover 时优先让电源按钮自身进入中等亮度发光
+    - 选中时让电源按钮达到最高亮度，并出现局部漏光效果
+    - 不再让整张卡片平均发亮
+  - 没有电源按钮的大容器（例如 advanced mode section）：
+    - 以轻整圈描边为底
+    - 再让两个对角做更亮的渐变增强
+    - 亮度高于普通边框，但不做漏光
+  - 不使用整圈平均发亮作为默认 hover 效果
 
 ## 当前技术约束
 

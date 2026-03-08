@@ -229,6 +229,44 @@ export function InlineHint({
   );
 }
 
+export function InfoHintIcon({
+  label,
+  description,
+  tone,
+  subtle = false,
+}: {
+  label: string;
+  description: string;
+  tone?: "active" | "failed" | "inactive" | "unknown";
+  subtle?: boolean;
+}) {
+  return (
+    <InlineHint label={label} description={description}>
+      <span
+        className={`inline-flex items-center justify-center rounded-full border font-medium transition ${
+          subtle
+            ? tone === "active"
+              ? "h-4 w-4 border-emerald-300/18 bg-emerald-300/[0.06] text-[9px] text-[color:var(--color-state-active)]/82 hover:border-emerald-300/28 hover:bg-emerald-300/[0.1] hover:text-[color:var(--color-state-active)]"
+              : tone === "unknown"
+                ? "h-4 w-4 border-sky-300/18 bg-sky-300/[0.06] text-[9px] text-[color:var(--color-state-unknown)]/82 hover:border-sky-300/28 hover:bg-sky-300/[0.1] hover:text-[color:var(--color-state-unknown)]"
+                : tone === "failed"
+                  ? "h-4 w-4 border-amber-300/18 bg-amber-300/[0.06] text-[9px] text-[color:var(--color-state-failed)]/82 hover:border-amber-300/28 hover:bg-amber-300/[0.1] hover:text-[color:var(--color-state-failed)]"
+                  : "h-4 w-4 border-white/10 bg-white/[0.03] text-[9px] text-[color:var(--color-text-soft)]/72 hover:border-white/18 hover:bg-white/[0.05] hover:text-white/82"
+            : tone === "active"
+              ? "h-[1.2rem] w-[1.2rem] border-emerald-300/22 bg-emerald-300/[0.08] text-[10px] text-[color:var(--color-state-active)]/88 hover:border-emerald-300/32 hover:bg-emerald-300/[0.12] hover:text-[color:var(--color-state-active)]"
+              : tone === "unknown"
+                ? "h-[1.2rem] w-[1.2rem] border-sky-300/22 bg-sky-300/[0.08] text-[10px] text-[color:var(--color-state-unknown)]/88 hover:border-sky-300/32 hover:bg-sky-300/[0.12] hover:text-[color:var(--color-state-unknown)]"
+                : tone === "failed"
+                  ? "h-[1.2rem] w-[1.2rem] border-amber-300/22 bg-amber-300/[0.08] text-[10px] text-[color:var(--color-state-failed)]/88 hover:border-amber-300/32 hover:bg-amber-300/[0.12] hover:text-[color:var(--color-state-failed)]"
+                  : "h-[1.2rem] w-[1.2rem] border-white/18 bg-white/[0.05] text-[10px] text-[color:var(--color-text-soft)]/88 hover:border-white/28 hover:bg-white/[0.075] hover:text-white/95"
+        }`}
+      >
+        i
+      </span>
+    </InlineHint>
+  );
+}
+
 export function AlertStrip({ message }: { message: string }) {
   return (
     <div

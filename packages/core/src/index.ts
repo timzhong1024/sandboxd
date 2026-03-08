@@ -16,21 +16,6 @@ export const managedEntityCapabilitiesSchema = z.object({
   canRestart: z.boolean(),
 });
 
-export const managedEntitySummarySchema = z.object({
-  kind: managedEntityKindSchema,
-  origin: managedEntityOriginSchema,
-  unitName: z.string(),
-  unitType: z.string(),
-  state: z.string(),
-  subState: z.string().optional(),
-  loadState: z.string().optional(),
-  slice: z.string().optional(),
-  description: z.string().optional(),
-  sandboxProfile: z.string().optional(),
-  labels: z.record(z.string(), z.string()),
-  capabilities: managedEntityCapabilitiesSchema,
-});
-
 export const resourceControlsSchema = z.object({
   cpuWeight: z.string().optional(),
   memoryMax: z.string().optional(),
@@ -42,6 +27,23 @@ export const sandboxingSchema = z.object({
   privateTmp: z.boolean().optional(),
   protectSystem: z.string().optional(),
   protectHome: z.boolean().optional(),
+});
+
+export const managedEntitySummarySchema = z.object({
+  kind: managedEntityKindSchema,
+  origin: managedEntityOriginSchema,
+  unitName: z.string(),
+  unitType: z.string(),
+  state: z.string(),
+  subState: z.string().optional(),
+  loadState: z.string().optional(),
+  slice: z.string().optional(),
+  description: z.string().optional(),
+  sandboxProfile: z.string().optional(),
+  resourceControls: resourceControlsSchema.optional(),
+  sandboxing: sandboxingSchema.optional(),
+  labels: z.record(z.string(), z.string()),
+  capabilities: managedEntityCapabilitiesSchema,
 });
 
 export const advancedPropertyGroupSchema = z.enum([
@@ -228,6 +230,12 @@ export const advancedPropertySpecSchema = z.object({
   supportStatus: z.enum(["inspect-only", "planned"]),
 });
 
+export const advancedPropertyGroupSpecSchema = z.object({
+  key: advancedPropertyGroupSchema,
+  title: z.string(),
+  description: z.string(),
+});
+
 export const managedEntityStatusSchema = z.object({
   activeState: z.string(),
   subState: z.string(),
@@ -301,6 +309,7 @@ export type CountLimitValue = z.infer<typeof countLimitValueSchema>;
 export type AdvancedProperties = z.infer<typeof advancedPropertiesSchema>;
 export type UnknownSystemdDirective = z.infer<typeof unknownSystemdDirectiveSchema>;
 export type AdvancedPropertySpec = z.infer<typeof advancedPropertySpecSchema>;
+export type AdvancedPropertyGroupSpec = z.infer<typeof advancedPropertyGroupSpecSchema>;
 export type CreateSandboxServiceInput = z.infer<typeof createSandboxServiceInputSchema>;
 export type DangerousAdoptManagedEntityInput = z.infer<
   typeof dangerousAdoptManagedEntityInputSchema
@@ -504,6 +513,44 @@ export const supportedAdvancedPropertySpecs = [
     supportStatus: "inspect-only",
   },
 ] as const satisfies ReadonlyArray<AdvancedPropertySpec>;
+
+export const supportedAdvancedPropertyGroupSpecs = [
+  {
+    key: "filesystem",
+    title: "Filesystem",
+    description: "Filesystem exposure, writable exceptions, and path visibility controls.",
+  },
+  {
+    key: "privilege",
+    title: "Privilege",
+    description: "Privilege reduction, capability bounding, and execution hardening controls.",
+  },
+  {
+    key: "isolation",
+    title: "Isolation",
+    description: "Namespace isolation for users, devices, and network access.",
+  },
+  {
+    key: "syscall",
+    title: "System Call",
+    description: "System call allow or deny filters applied to the service process.",
+  },
+  {
+    key: "network",
+    title: "Network",
+    description: "Network-related restrictions such as allowed socket address families.",
+  },
+  {
+    key: "resource",
+    title: "Resource",
+    description: "Resource control values applied to the unit cgroup.",
+  },
+  {
+    key: "process",
+    title: "Process",
+    description: "Process start-up context such as working directory and environment.",
+  },
+] as const satisfies ReadonlyArray<AdvancedPropertyGroupSpec>;
 
 export const supportedAdvancedPropertyKeys = supportedAdvancedPropertySpecs.map(
   (spec) => spec.key,
@@ -884,6 +931,8 @@ export function mapSystemdUnitRecord(record: SystemdUnitRecord): ManagedEntitySu
     loadState: record.loadState,
     slice: record.slice,
     description: record.description,
+    resourceControls: {},
+    sandboxing: {},
     labels: {},
     capabilities: getManagedEntityCapabilities({
       origin: "external",
@@ -935,4 +984,8 @@ export function parseDangerousAdoptManagedEntityInput(
 
 export function getSupportedAdvancedPropertySpec(key: SupportedAdvancedPropertyKey) {
   return supportedAdvancedPropertySpecs.find((spec) => spec.key === key);
+}
+
+export function getSupportedAdvancedPropertyGroupSpec(key: AdvancedPropertyGroup) {
+  return supportedAdvancedPropertyGroupSpecs.find((spec) => spec.key === key);
 }

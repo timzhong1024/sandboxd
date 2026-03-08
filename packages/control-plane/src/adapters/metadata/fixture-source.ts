@@ -42,8 +42,14 @@ const initialManagedEntityFixtures: FixtureStore = {
         source: "host",
       },
       capabilities: createCapabilities("external", "active"),
-      resourceControls: {},
-      sandboxing: {},
+      resourceControls: {
+        cpuWeight: "150",
+        memoryMax: "1G",
+      },
+      sandboxing: {
+        noNewPrivileges: true,
+        privateTmp: true,
+      },
       status: {
         activeState: "active",
         subState: "running",
@@ -77,6 +83,96 @@ const initialManagedEntityFixtures: FixtureStore = {
       status: {
         activeState: "active",
         subState: "running",
+        loadState: "loaded",
+      },
+    },
+    {
+      kind: "sandbox-service",
+      origin: "sandboxd",
+      unitName: "lab-worker.service",
+      unitType: "service",
+      state: "active",
+      subState: "running",
+      loadState: "loaded",
+      slice: "sandboxd.slice",
+      description: "Sandboxd managed lab worker",
+      labels: {
+        source: "sandboxd",
+      },
+      sandboxProfile: "baseline",
+      capabilities: createCapabilities("sandboxd", "active"),
+      resourceControls: {
+        cpuWeight: "350",
+        memoryMax: "2G",
+      },
+      sandboxing: {
+        noNewPrivileges: true,
+        privateTmp: true,
+        protectSystem: "full",
+      },
+      status: {
+        activeState: "active",
+        subState: "running",
+        loadState: "loaded",
+      },
+    },
+    {
+      kind: "sandbox-service",
+      origin: "sandboxd",
+      unitName: "lab-batch.service",
+      unitType: "service",
+      state: "failed",
+      subState: "failed",
+      loadState: "loaded",
+      slice: "sandboxd.slice",
+      description: "Sandboxd managed failed batch job",
+      labels: {
+        source: "sandboxd",
+      },
+      sandboxProfile: "strict",
+      capabilities: createCapabilities("sandboxd", "failed"),
+      resourceControls: {
+        cpuWeight: "120",
+        memoryMax: "768M",
+      },
+      sandboxing: {
+        noNewPrivileges: true,
+        privateTmp: true,
+        protectSystem: "strict",
+        protectHome: true,
+      },
+      status: {
+        activeState: "failed",
+        subState: "failed",
+        loadState: "loaded",
+      },
+    },
+    {
+      kind: "sandbox-service",
+      origin: "sandboxd",
+      unitName: "lab-cache.service",
+      unitType: "service",
+      state: "inactive",
+      subState: "dead",
+      loadState: "loaded",
+      slice: "sandboxd.slice",
+      description: "Sandboxd managed stopped cache service",
+      labels: {
+        source: "sandboxd",
+      },
+      sandboxProfile: "baseline",
+      capabilities: createCapabilities("sandboxd", "inactive"),
+      resourceControls: {
+        cpuWeight: "100",
+        memoryMax: "256M",
+      },
+      sandboxing: {
+        noNewPrivileges: true,
+        privateTmp: true,
+      },
+      status: {
+        activeState: "inactive",
+        subState: "dead",
         loadState: "loaded",
       },
     },
@@ -126,12 +222,7 @@ function cloneEntity(entity: ManagedEntityDetail): ManagedEntityDetail {
 }
 
 function toSummary(entity: ManagedEntityDetail): ManagedEntitySummary {
-  const {
-    resourceControls: _resourceControls,
-    sandboxing: _sandboxing,
-    status: _status,
-    ...summary
-  } = entity;
+  const { status: _status, ...summary } = entity;
 
   return summary;
 }
