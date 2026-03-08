@@ -21,14 +21,11 @@ export function mergeSummaryWithMetadata(
     slice: metadata.slice ?? summary.slice,
     description: metadata.description ?? summary.description,
     sandboxProfile: metadata.sandboxProfile ?? summary.sandboxProfile,
-    resourceControls: {
-      ...summary.resourceControls,
-      ...metadata.resourceControls,
-    },
-    sandboxing: {
-      ...summary.sandboxing,
-      ...metadata.sandboxing,
-    },
+    resourceControls: mergeObjectPreferringPrimary(
+      summary.resourceControls,
+      metadata.resourceControls,
+    ),
+    sandboxing: mergeObjectPreferringPrimary(summary.sandboxing, metadata.sandboxing),
     capabilities: getManagedEntityCapabilities({
       origin: "sandboxd",
       state: summary.state,
@@ -48,21 +45,43 @@ export function mergeDetailWithMetadata(
 
   return enrichManagedEntityDetail({
     ...mergeSummaryWithMetadata(detail, metadata),
-    resourceControls: {
-      ...detail.resourceControls,
-      ...metadata.resourceControls,
-    },
-    sandboxing: {
-      ...detail.sandboxing,
-      ...metadata.sandboxing,
-    },
-    advancedProperties: {
-      ...detail.advancedProperties,
-      ...metadata.advancedProperties,
-    },
+    resourceControls: mergeObjectPreferringPrimary(
+      detail.resourceControls,
+      metadata.resourceControls,
+    ),
+    sandboxing: mergeObjectPreferringPrimary(detail.sandboxing, metadata.sandboxing),
+    advancedProperties: mergeObjectPreferringPrimary(
+      detail.advancedProperties,
+      metadata.advancedProperties,
+    ),
     unknownSystemdDirectives: metadata.unknownSystemdDirectives ?? detail.unknownSystemdDirectives,
     status: detail.status,
   });
+}
+
+function mergeObjectPreferringPrimary<T extends Record<string, unknown>>(
+  primary: T | undefined,
+  secondary: T | undefined,
+): T {
+  if (!primary) {
+    return (secondary ?? {}) as T;
+  }
+
+  if (!secondary) {
+    return primary;
+  }
+
+  const merged: Record<string, unknown> = {
+    ...primary,
+  };
+
+  for (const [key, value] of Object.entries(secondary)) {
+    if (merged[key] === undefined) {
+      merged[key] = value;
+    }
+  }
+
+  return merged as T;
 }
 
 export function createSummaryFromMetadata(

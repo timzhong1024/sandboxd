@@ -1153,10 +1153,55 @@ export function buildProfileMapping(
 }
 
 export function enrichManagedEntityDetail(detail: ManagedEntityDetail): ManagedEntityDetail {
+  const validationInput = stripMirroredAdvancedPropertiesForValidation(detail);
+
   return {
     ...detail,
     profileMapping: buildProfileMapping(detail),
-    validation: validateManagedEntityConfig(detail),
+    validation: validateManagedEntityConfig(validationInput),
+  };
+}
+
+function stripMirroredAdvancedPropertiesForValidation(
+  detail: ManagedEntityDetail,
+): ManagedEntityValidationInput {
+  if (!detail.advancedProperties) {
+    return detail;
+  }
+
+  const advancedProperties = { ...detail.advancedProperties };
+
+  if (detail.resourceControls.cpuWeight !== undefined) {
+    delete advancedProperties.CPUWeight;
+  }
+
+  if (detail.resourceControls.memoryMax !== undefined) {
+    delete advancedProperties.MemoryMax;
+  }
+
+  if (detail.resourceControls.tasksMax !== undefined) {
+    delete advancedProperties.TasksMax;
+  }
+
+  if (detail.sandboxing.noNewPrivileges !== undefined) {
+    delete advancedProperties.NoNewPrivileges;
+  }
+
+  if (detail.sandboxing.privateTmp !== undefined) {
+    delete advancedProperties.PrivateTmp;
+  }
+
+  if (detail.sandboxing.protectSystem !== undefined) {
+    delete advancedProperties.ProtectSystem;
+  }
+
+  if (detail.sandboxing.protectHome !== undefined) {
+    delete advancedProperties.ProtectHome;
+  }
+
+  return {
+    ...detail,
+    advancedProperties: Object.keys(advancedProperties).length > 0 ? advancedProperties : undefined,
   };
 }
 

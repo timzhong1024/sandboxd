@@ -54,14 +54,25 @@ Sandboxd 解决的是单机 homelab 场景下的“把杂乱的 service、sandbo
 ### V1 当前状态
 
 - V1 所需的控制面逻辑已经快速实现完成：WebUI、CLI、MCP、HTTP API 和 shared control-plane 都已闭环。
-- 当前状态应理解为“逻辑实现完成”，不是“实机验证完成”。
-- 目前仍缺少在真实宿主机 systemd 环境上的系统性实机验证，尤其是创建、dangerous adopt、drop-in ownership 标记和真实权限边界。
+- 已在真实宿主机 systemd 环境上完成一轮系统性实机验证，当前状态可以理解为“逻辑闭环 + 首轮真机验证完成”。
+- 现阶段更准确的边界不是“没有真机测试”，而是“真机验证已覆盖 V1 当前已实现的功能面，但仍未扩展到更大规模兼容性矩阵和长期稳定性验证”。
 
 ### 运行假设
 
 - 目标平台是启用 unified cgroup v2 的现代 Linux systemd 主机。
 - 默认信任边界是单机、单管理员。
 - 首版优先面向 system manager，而不是 user manager。
+
+### systemd 真机测试结论
+
+- 已在 Debian 13 (`trixie`) 测试机上完成一轮真实 systemd 验证，测试环境为 `systemd 257`、PID 1 为 `systemd`、system manager 运行正常。
+- 已验证 `apps/server`、CLI 和 shared control-plane 都会命中真实宿主机 systemd，而不是 fixture 路径。
+- 已验证真实 inventory 读取：`list` / `inspect` 可以读取宿主机现有 units。
+- 已验证 sandboxed service 生命周期：`create`、`start`、`restart`、`stop`、`update`、`delete` 都会真实落到 `/etc/systemd/system` 与 `systemctl`。
+- 已验证 `dangerous-adopt`：会真实写入 `X-Sandboxd` drop-in ownership 标记，并在 `daemon-reload` 后被控制面识别。
+- 已验证 HTTP API 主路径：`GET /api/entities`、`GET /api/entities/:unitName`、`POST /api/entities/:unitName/{start|stop|restart|dangerous-adopt}`、`POST /api/sandbox-services`、`PUT /api/sandbox-services/:unitName`、`DELETE /api/sandbox-services/:unitName`。
+- 在这轮实机测试中发现并修复了两个真实问题：一是 detail 校验里的伪 `duplicate-expression`，二是运行中的 service 在 `update` 后未立即反映到真实 runtime。
+- 当前尚未在 README 中声称 WebUI 浏览器交互、MCP tool 调用、多发行版兼容性、user manager、复杂权限边界或长期 soak test 已完成真机验证；这些仍属于后续验证范围。
 
 ## 核心实体模型
 
