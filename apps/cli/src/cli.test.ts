@@ -214,4 +214,24 @@ describe("runCli", () => {
     expect(exitCode).toBe(2);
     expect(stderr.write).toHaveBeenCalledWith(expect.stringContaining("requires --exec-start"));
   });
+
+  test("returns exit code 2 for invalid profile flags", async () => {
+    const stderr = { write: vi.fn() };
+
+    const exitCode = await runCli(
+      [
+        "create",
+        "sandboxed-service",
+        "lab-worker",
+        "--exec-start",
+        "/usr/bin/python worker.py",
+        "--profile",
+        "strcit",
+      ],
+      { stderr },
+    );
+
+    expect(exitCode).toBe(2);
+    expect(stderr.write).toHaveBeenCalledWith(expect.stringContaining("Unsupported profile"));
+  });
 });

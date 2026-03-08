@@ -343,7 +343,15 @@ function asOptionalBoolean(value: string | boolean | undefined) {
 }
 
 function asOptionalProfile(value: string | boolean | undefined) {
-  return value === "baseline" || value === "strict" ? value : undefined;
+  if (value === undefined || typeof value === "boolean") {
+    return undefined;
+  }
+
+  if (value === "baseline" || value === "strict") {
+    return value;
+  }
+
+  throw new CliArgumentError(`Unsupported profile: ${value}`);
 }
 
 function writeOutput(

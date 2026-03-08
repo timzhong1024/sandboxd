@@ -1,7 +1,6 @@
 import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import {
-  sandboxProfileSchema,
   type AdvancedBooleanListMode,
   type AdvancedListMode,
   type AdvancedProperties,
@@ -38,7 +37,7 @@ const ignoredKnownDirectiveKeys = new Set([
 
 const sandboxdMetadataSchema = z.object({
   owned: z.boolean().optional(),
-  sandboxProfile: sandboxProfileSchema.optional(),
+  sandboxProfile: z.string().optional(),
   advancedProperties: advancedPropertiesSchema.optional(),
   unknownSystemdDirectives: z.array(unknownSystemdDirectiveSchema).optional(),
 });
@@ -69,7 +68,7 @@ export function createFilesystemMetadataSource(
       advancedProperties: metadata.advancedProperties,
       unknownSystemdDirectives: metadata.unknownSystemdDirectives,
       unitName,
-      sandboxProfile: metadata.sandboxProfile,
+      sandboxProfile: normalizeSandboxProfile(metadata.sandboxProfile),
     });
   };
   const saveManagedEntityMetadata = async (unitName: string, input: CreateSandboxServiceInput) => {
@@ -167,6 +166,14 @@ function createMetadataRecord(record: {
   };
 }
 
+function normalizeSandboxProfile(value: string | undefined): SandboxProfile | undefined {
+  if (value === "baseline" || value === "strict") {
+    return value;
+  }
+
+  return undefined;
+}
+
 async function readSandboxdMetadata(rootDir: string, unitName: string) {
   const sources = [
     { path: getManagedUnitFilePath(rootDir, unitName), source: "unit-file" as const },
@@ -204,7 +211,7 @@ async function readSandboxdMetadata(rootDir: string, unitName: string) {
     owned: parseBooleanValue(merged.Owned ?? merged["X-Sandboxd-Owned"]),
     advancedProperties,
     unknownSystemdDirectives,
-    sandboxProfile: merged.Profile ?? merged["X-Sandboxd-Profile"],
+    sandboxProfile: normalizeSandboxProfile(merged.Profile ?? merged["X-Sandboxd-Profile"]),
   });
 }
 
