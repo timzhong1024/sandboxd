@@ -1,13 +1,15 @@
 import { mkdir, readdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import type {
-  AdvancedBooleanListMode,
-  AdvancedListMode,
-  AdvancedProperties,
-  CreateSandboxServiceInput,
-  DangerousAdoptManagedEntityInput,
-  SupportedAdvancedPropertyKey,
-  UnknownSystemdDirective,
+import {
+  sandboxProfileSchema,
+  type AdvancedBooleanListMode,
+  type AdvancedListMode,
+  type AdvancedProperties,
+  type CreateSandboxServiceInput,
+  type DangerousAdoptManagedEntityInput,
+  type SandboxProfile,
+  type SupportedAdvancedPropertyKey,
+  type UnknownSystemdDirective,
 } from "@sandboxd/core";
 import {
   advancedPropertiesSchema,
@@ -36,7 +38,7 @@ const ignoredKnownDirectiveKeys = new Set([
 
 const sandboxdMetadataSchema = z.object({
   owned: z.boolean().optional(),
-  sandboxProfile: z.string().optional(),
+  sandboxProfile: sandboxProfileSchema.optional(),
   advancedProperties: advancedPropertiesSchema.optional(),
   unknownSystemdDirectives: z.array(unknownSystemdDirectiveSchema).optional(),
 });
@@ -54,6 +56,7 @@ export function createFilesystemMetadataSource(
   | "getManagedEntityMetadata"
   | "listManagedEntityMetadata"
   | "saveManagedEntityMetadata"
+  | "updateManagedEntityMetadata"
 > {
   const rootDir = options.rootDir ?? getDefaultMetadataRootDir();
   const getManagedMetadataForUnit = async (unitName: string) => {
@@ -68,6 +71,18 @@ export function createFilesystemMetadataSource(
       unitName,
       sandboxProfile: metadata.sandboxProfile,
     });
+  };
+  const saveManagedEntityMetadata = async (unitName: string, input: CreateSandboxServiceInput) => {
+    const record = createMetadataRecord({
+      unitName,
+      sandboxProfile: input.sandboxProfile,
+    });
+
+    await writeSandboxdDropIn(rootDir, unitName, {
+      sandboxProfile: input.sandboxProfile,
+    });
+
+    return record;
   };
 
   return {
@@ -98,17 +113,9 @@ export function createFilesystemMetadataSource(
       managedRecords.sort((left, right) => left.unitName.localeCompare(right.unitName));
       return managedRecords;
     },
-    async saveManagedEntityMetadata(unitName, input: CreateSandboxServiceInput) {
-      const record = createMetadataRecord({
-        unitName,
-        sandboxProfile: input.sandboxProfile,
-      });
-
-      await writeSandboxdDropIn(rootDir, unitName, {
-        sandboxProfile: input.sandboxProfile,
-      });
-
-      return record;
+    saveManagedEntityMetadata,
+    async updateManagedEntityMetadata(unitName, input: CreateSandboxServiceInput) {
+      return saveManagedEntityMetadata(unitName, input);
     },
   };
 }
@@ -144,7 +151,7 @@ async function listCandidateUnitNames(rootDir: string) {
 
 function createMetadataRecord(record: {
   advancedProperties?: AdvancedProperties;
-  sandboxProfile: string | undefined;
+  sandboxProfile: SandboxProfile | undefined;
   unknownSystemdDirectives?: UnknownSystemdDirective[];
   unitName: string;
 }): ManagedEntityMetadataRecord {

@@ -1,4 +1,5 @@
 import {
+  enrichManagedEntityDetail,
   getManagedEntityCapabilities,
   type ManagedEntityDetail,
   type ManagedEntitySummary,
@@ -42,10 +43,10 @@ export function mergeDetailWithMetadata(
   metadata: ManagedEntityMetadataRecord | null,
 ): ManagedEntityDetail {
   if (!metadata) {
-    return detail;
+    return enrichManagedEntityDetail(detail);
   }
 
-  return {
+  return enrichManagedEntityDetail({
     ...mergeSummaryWithMetadata(detail, metadata),
     resourceControls: {
       ...detail.resourceControls,
@@ -61,7 +62,7 @@ export function mergeDetailWithMetadata(
     },
     unknownSystemdDirectives: metadata.unknownSystemdDirectives ?? detail.unknownSystemdDirectives,
     status: detail.status,
-  };
+  });
 }
 
 export function createSummaryFromMetadata(

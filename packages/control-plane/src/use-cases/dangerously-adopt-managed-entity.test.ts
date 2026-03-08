@@ -14,6 +14,7 @@ function createMetadataSource(): ManagedEntityMetadataSourcePort {
 
   return {
     createFallbackSandboxService: vi.fn(),
+    deleteFallbackSandboxService: vi.fn().mockResolvedValue(false),
     dangerouslyAdoptFallbackEntity: vi.fn().mockResolvedValue(null),
     dangerouslyAdoptManagedEntity: vi.fn().mockImplementation(async (unitName, input) => {
       managedRecord = {
@@ -30,13 +31,16 @@ function createMetadataSource(): ManagedEntityMetadataSourcePort {
     listFallbackEntitySummaries: vi.fn().mockResolvedValue([]),
     listManagedEntityMetadata: vi.fn().mockResolvedValue([]),
     saveManagedEntityMetadata: vi.fn(),
+    updateFallbackSandboxService: vi.fn().mockResolvedValue(null),
     updateFallbackEntityState: vi.fn().mockResolvedValue(null),
+    updateManagedEntityMetadata: vi.fn(),
   };
 }
 
 function createRuntime(overrides: Partial<SystemdRuntimePort>): SystemdRuntimePort {
   return {
     createSandboxService: vi.fn().mockResolvedValue(undefined),
+    deleteSandboxService: vi.fn().mockResolvedValue(undefined),
     getUnit: vi.fn().mockResolvedValue({
       unitName: "docker.service",
       loadState: "loaded",
@@ -52,6 +56,7 @@ function createRuntime(overrides: Partial<SystemdRuntimePort>): SystemdRuntimePo
     restartUnit: vi.fn().mockResolvedValue(undefined),
     startUnit: vi.fn().mockResolvedValue(undefined),
     stopUnit: vi.fn().mockResolvedValue(undefined),
+    updateSandboxService: vi.fn().mockResolvedValue(undefined),
     ...overrides,
   };
 }

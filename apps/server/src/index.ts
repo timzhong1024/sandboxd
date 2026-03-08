@@ -14,6 +14,8 @@ const app = createApp({
   restartManagedEntity: controlPlane.restartManagedEntity,
   dangerouslyAdoptManagedEntity: controlPlane.dangerouslyAdoptManagedEntity,
   createSandboxService: controlPlane.createSandboxService,
+  updateSandboxService: controlPlane.updateSandboxService,
+  deleteSandboxService: controlPlane.deleteSandboxService,
 });
 
 app.listen(port, host, () => {

@@ -25,6 +25,8 @@ test("delegates managed entity loading to the client port", async () => {
     stopManagedEntity: vi.fn(),
     restartManagedEntity: vi.fn(),
     createSandboxService: vi.fn(),
+    updateSandboxService: vi.fn(),
+    deleteSandboxService: vi.fn(),
   };
 
   const loadManagedEntities = createLoadManagedEntities({ client });

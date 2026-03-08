@@ -41,6 +41,27 @@ export function createManagedEntitiesHttpClient(): ManagedEntitiesClientPort {
       await assertOk(response, "Failed to create sandbox service");
       return parseManagedEntityDetail(await response.json());
     },
+    async updateSandboxService(
+      unitName: string,
+      input: CreateSandboxServiceInput,
+    ): Promise<ManagedEntityDetail> {
+      const validatedInput = parseCreateSandboxServiceInput(input);
+      const response = await fetch(`/api/sandbox-services/${encodeURIComponent(unitName)}`, {
+        method: "PUT",
+        headers: {
+          "content-type": "application/json",
+        },
+        body: JSON.stringify(validatedInput),
+      });
+      await assertOk(response, `Failed to update sandbox service: ${unitName}`);
+      return parseManagedEntityDetail(await response.json());
+    },
+    async deleteSandboxService(unitName: string): Promise<void> {
+      const response = await fetch(`/api/sandbox-services/${encodeURIComponent(unitName)}`, {
+        method: "DELETE",
+      });
+      await assertOk(response, `Failed to delete sandbox service: ${unitName}`);
+    },
   };
 }
 

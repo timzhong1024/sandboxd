@@ -9,24 +9,35 @@ import { createInspectManagedEntity } from "./inspect-managed-entity";
 import { ManagedEntityConflictError } from "./managed-entity-errors";
 import { shouldFallbackToMetadata } from "./systemd-runtime-fallback";
 
-interface CreateCreateSandboxServiceOptions {
+interface CreateUpdateSandboxServiceOptions {
   metadataSource: ManagedEntityMetadataSourcePort;
   systemdRuntime: SystemdRuntimePort;
 }
 
-export function createCreateSandboxService({
+export function createUpdateSandboxService({
   metadataSource,
   systemdRuntime,
-}: CreateCreateSandboxServiceOptions) {
+}: CreateUpdateSandboxServiceOptions) {
   const inspectManagedEntity = createInspectManagedEntity({
     metadataSource,
     systemdRuntime,
   });
 
-  return async function createSandboxService(
+  return async function updateSandboxService(
+    unitName: string,
     input: CreateSandboxServiceInput,
   ): Promise<ManagedEntityDetail> {
-    const unitName = input.name.endsWith(".service") ? input.name : `${input.name}.service`;
+    const entity = await inspectManagedEntity(unitName);
+    if (entity.origin !== "sandboxd" || entity.kind !== "sandbox-service") {
+      throw new ManagedEntityConflictError(`Managed entity cannot be updated: ${unitName}`);
+    }
+
+    if (entity.validation?.readonly) {
+      throw new ManagedEntityConflictError(
+        entity.validation.readonlyReasons[0] ?? `Managed entity cannot be updated: ${unitName}`,
+      );
+    }
+
     const validation = validateManagedEntityConfig(input);
     if (validation.errors.length > 0) {
       throw new ManagedEntityConflictError(
@@ -35,21 +46,20 @@ export function createCreateSandboxService({
     }
 
     try {
-      await metadataSource.saveManagedEntityMetadata(unitName, input);
-      try {
-        await systemdRuntime.createSandboxService(unitName, input);
-      } catch (error: unknown) {
-        await metadataSource.deleteManagedEntityMetadata(unitName);
-        throw error;
-      }
-
+      await systemdRuntime.updateSandboxService(unitName, input);
+      await metadataSource.updateManagedEntityMetadata(unitName, input);
       return await inspectManagedEntity(unitName);
     } catch (error: unknown) {
       if (!shouldFallbackToMetadata(error)) {
         throw error;
       }
 
-      return metadataSource.createFallbackSandboxService(input);
+      const fallbackEntity = await metadataSource.updateFallbackSandboxService(unitName, input);
+      if (!fallbackEntity) {
+        throw new ManagedEntityConflictError(`Managed entity cannot be updated: ${unitName}`);
+      }
+
+      return fallbackEntity;
     }
   };
 }

@@ -5,12 +5,14 @@ import { runCli } from "./cli";
 function createControlPlaneMock(): ControlPlane {
   return {
     createSandboxService: vi.fn(),
+    deleteSandboxService: vi.fn(),
     dangerouslyAdoptManagedEntity: vi.fn(),
     inspectManagedEntity: vi.fn(),
     listManagedEntities: vi.fn(),
     restartManagedEntity: vi.fn(),
     startManagedEntity: vi.fn(),
     stopManagedEntity: vi.fn(),
+    updateSandboxService: vi.fn(),
   };
 }
 

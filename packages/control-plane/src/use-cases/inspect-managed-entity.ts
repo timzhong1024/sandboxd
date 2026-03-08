@@ -1,4 +1,8 @@
-import { mapSystemdUnitDetailRecord, type ManagedEntityDetail } from "@sandboxd/core";
+import {
+  enrichManagedEntityDetail,
+  mapSystemdUnitDetailRecord,
+  type ManagedEntityDetail,
+} from "@sandboxd/core";
 import type { ManagedEntityMetadataSourcePort } from "../ports/managed-entity-metadata-source-port";
 import type { SystemdRuntimePort } from "../ports/systemd-runtime-port";
 import { mergeDetailWithMetadata } from "./managed-entity-metadata";
@@ -31,7 +35,7 @@ export function createInspectManagedEntity({
         throw new ManagedEntityNotFoundError(`Managed entity not found: ${unitName}`);
       }
 
-      return fallbackEntity;
+      return enrichManagedEntityDetail(fallbackEntity);
     }
 
     throw new ManagedEntityNotFoundError(`Managed entity not found: ${unitName}`);

@@ -14,10 +14,12 @@ interface CreateCombinedMetadataSourceOptions {
   fallbackSource: Pick<
     ManagedEntityMetadataSourcePort,
     | "createFallbackSandboxService"
+    | "deleteFallbackSandboxService"
     | "dangerouslyAdoptFallbackEntity"
     | "getFallbackEntityDetail"
     | "listFallbackEntitySummaries"
     | "updateFallbackEntityState"
+    | "updateFallbackSandboxService"
   >;
   managedEntitySource: Pick<
     ManagedEntityMetadataSourcePort,
@@ -26,6 +28,7 @@ interface CreateCombinedMetadataSourceOptions {
     | "getManagedEntityMetadata"
     | "listManagedEntityMetadata"
     | "saveManagedEntityMetadata"
+    | "updateManagedEntityMetadata"
   >;
 }
 
@@ -38,6 +41,9 @@ export function createCombinedMetadataSource({
       input: CreateSandboxServiceInput,
     ): Promise<ManagedEntityDetail> {
       return fallbackSource.createFallbackSandboxService(input);
+    },
+    async deleteFallbackSandboxService(unitName: string): Promise<boolean> {
+      return fallbackSource.deleteFallbackSandboxService(unitName);
     },
     async dangerouslyAdoptFallbackEntity(
       unitName: string,
@@ -74,11 +80,23 @@ export function createCombinedMetadataSource({
     ): Promise<ManagedEntityMetadataRecord> {
       return managedEntitySource.saveManagedEntityMetadata(unitName, input);
     },
+    async updateFallbackSandboxService(
+      unitName: string,
+      input: CreateSandboxServiceInput,
+    ): Promise<ManagedEntityDetail | null> {
+      return fallbackSource.updateFallbackSandboxService(unitName, input);
+    },
     async updateFallbackEntityState(
       unitName: string,
       state: string,
     ): Promise<ManagedEntityDetail | null> {
       return fallbackSource.updateFallbackEntityState(unitName, state);
+    },
+    async updateManagedEntityMetadata(
+      unitName: string,
+      input: CreateSandboxServiceInput,
+    ): Promise<ManagedEntityMetadataRecord> {
+      return managedEntitySource.updateManagedEntityMetadata(unitName, input);
     },
   };
 }

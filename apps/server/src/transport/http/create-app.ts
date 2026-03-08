@@ -32,6 +32,11 @@ interface CreateAppOptions {
     input: DangerousAdoptManagedEntityInput,
   ) => Promise<ManagedEntityDetail>;
   createSandboxService: (input: CreateSandboxServiceInput) => Promise<ManagedEntityDetail>;
+  updateSandboxService: (
+    unitName: string,
+    input: CreateSandboxServiceInput,
+  ) => Promise<ManagedEntityDetail>;
+  deleteSandboxService: (unitName: string) => Promise<void>;
 }
 
 export function createApp({
@@ -43,6 +48,8 @@ export function createApp({
   restartManagedEntity,
   dangerouslyAdoptManagedEntity,
   createSandboxService,
+  updateSandboxService,
+  deleteSandboxService,
 }: CreateAppOptions) {
   return createServer(async (request, response) => {
     try {
@@ -117,6 +124,31 @@ export function createApp({
         const input = parseCreateSandboxServiceInput(body);
         sendJson(response, 201, parseManagedEntityDetail(await createSandboxService(input)));
         return;
+      }
+
+      const sandboxServiceMatch = /^\/api\/sandbox-services\/(?<unitName>[^/]+)$/.exec(
+        url.pathname,
+      );
+      if (sandboxServiceMatch?.groups?.unitName) {
+        const unitName = decodeURIComponent(sandboxServiceMatch.groups.unitName);
+
+        if (request.method === "PUT") {
+          const body = await readJsonBody(request);
+          const input = parseCreateSandboxServiceInput(body);
+          sendJson(
+            response,
+            200,
+            parseManagedEntityDetail(await updateSandboxService(unitName, input)),
+          );
+          return;
+        }
+
+        if (request.method === "DELETE") {
+          await deleteSandboxService(unitName);
+          response.statusCode = 204;
+          response.end();
+          return;
+        }
       }
 
       sendJson(response, 404, { error: "Not Found" });
