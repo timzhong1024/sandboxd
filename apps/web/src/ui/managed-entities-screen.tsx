@@ -1212,13 +1212,45 @@ function MetaBlock({ label, value }: { label: string; value: ReactNode }) {
 }
 
 function InventoryStateBadge({ selected, state }: { selected?: boolean; state: string }) {
+  const tone = getStateTone(state);
+  const frameClass =
+    tone === "active"
+      ? selected
+        ? "bg-[radial-gradient(circle_at_34%_34%,rgba(210,252,162,0.24),rgba(210,252,162,0.13)_24%,rgba(210,252,162,0.05)_50%,transparent_76%)] shadow-[0_0_18px_rgba(210,252,162,0.16)]"
+        : "group-hover:bg-[radial-gradient(circle_at_34%_34%,rgba(210,252,162,0.12),rgba(210,252,162,0.06)_28%,rgba(210,252,162,0.02)_54%,transparent_78%)] group-hover:shadow-[0_0_12px_rgba(210,252,162,0.08)]"
+      : tone === "failed"
+        ? selected
+          ? "bg-[radial-gradient(circle_at_34%_34%,rgba(246,208,138,0.26),rgba(246,208,138,0.14)_24%,rgba(246,208,138,0.05)_50%,transparent_76%)] shadow-[0_0_18px_rgba(246,208,138,0.16)]"
+          : "group-hover:bg-[radial-gradient(circle_at_34%_34%,rgba(246,208,138,0.13),rgba(246,208,138,0.07)_28%,rgba(246,208,138,0.02)_54%,transparent_78%)] group-hover:shadow-[0_0_12px_rgba(246,208,138,0.08)]"
+        : tone === "inactive"
+          ? selected
+            ? "bg-[radial-gradient(circle_at_34%_34%,rgba(255,255,255,0.22),rgba(255,255,255,0.12)_24%,rgba(255,255,255,0.04)_50%,transparent_76%)] shadow-[0_0_18px_rgba(255,255,255,0.14)]"
+            : "group-hover:bg-[radial-gradient(circle_at_34%_34%,rgba(255,255,255,0.12),rgba(255,255,255,0.06)_28%,rgba(255,255,255,0.02)_54%,transparent_78%)] group-hover:shadow-[0_0_12px_rgba(255,255,255,0.08)]"
+          : selected
+            ? "bg-[radial-gradient(circle_at_34%_34%,rgba(147,197,253,0.24),rgba(147,197,253,0.13)_24%,rgba(147,197,253,0.05)_50%,transparent_76%)] shadow-[0_0_18px_rgba(147,197,253,0.14)]"
+            : "group-hover:bg-[radial-gradient(circle_at_34%_34%,rgba(147,197,253,0.12),rgba(147,197,253,0.06)_28%,rgba(147,197,253,0.02)_54%,transparent_78%)] group-hover:shadow-[0_0_12px_rgba(147,197,253,0.08)]";
+  const badgeShadowClass =
+    tone === "active"
+      ? selected
+        ? "shadow-[inset_0_1px_0_rgba(210,252,162,0.12)]"
+        : "group-hover:shadow-[inset_0_1px_0_rgba(210,252,162,0.08)]"
+      : tone === "failed"
+        ? selected
+          ? "shadow-[inset_0_1px_0_rgba(246,208,138,0.14)]"
+          : "group-hover:shadow-[inset_0_1px_0_rgba(246,208,138,0.1)]"
+        : tone === "inactive"
+          ? selected
+            ? "shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]"
+            : "group-hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]"
+          : selected
+            ? "shadow-[inset_0_1px_0_rgba(147,197,253,0.12)]"
+            : "group-hover:shadow-[inset_0_1px_0_rgba(147,197,253,0.08)]";
+
   return (
     <InlineHint label="State" description={state}>
       <span
         className={`inline-flex rounded-full ${
-          selected
-            ? "bg-[radial-gradient(circle_at_34%_34%,rgba(210,252,162,0.24),rgba(210,252,162,0.13)_24%,rgba(210,252,162,0.05)_50%,transparent_76%)] p-[1px] shadow-[0_0_18px_rgba(210,252,162,0.16)]"
-            : "p-[1px] group-hover:bg-[radial-gradient(circle_at_34%_34%,rgba(210,252,162,0.12),rgba(210,252,162,0.06)_28%,rgba(210,252,162,0.02)_54%,transparent_78%)] group-hover:shadow-[0_0_12px_rgba(210,252,162,0.08)]"
+          selected ? `p-[1px] ${frameClass}` : `p-[1px] ${frameClass}`
         }`}
         style={{
           transition:
@@ -1226,11 +1258,11 @@ function InventoryStateBadge({ selected, state }: { selected?: boolean; state: s
         }}
       >
         <StatusBadge
-          state={getStateTone(state)}
+          state={tone}
           className={`min-w-0 justify-center px-1.5 ${
             selected
-              ? "opacity-100 shadow-[inset_0_1px_0_rgba(210,252,162,0.12)]"
-              : "opacity-70 group-hover:opacity-90 group-hover:shadow-[inset_0_1px_0_rgba(210,252,162,0.08)]"
+              ? `opacity-100 ${badgeShadowClass}`
+              : `opacity-70 group-hover:opacity-90 ${badgeShadowClass}`
           }`}
           style={{
             transition: "opacity 220ms ease, box-shadow 220ms ease, filter 220ms ease",

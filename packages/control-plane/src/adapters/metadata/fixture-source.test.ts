@@ -37,6 +37,15 @@ test("returns the mixed fallback fixture by default", async () => {
         memoryMax: "768M",
       },
     },
+    {
+      unitName: "lab-cache.service",
+      state: "inactive",
+      sandboxProfile: "baseline",
+      resourceControls: {
+        cpuWeight: "100",
+        memoryMax: "256M",
+      },
+    },
   ]);
 });
 

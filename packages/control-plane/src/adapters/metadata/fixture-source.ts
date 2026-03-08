@@ -147,6 +147,35 @@ const initialManagedEntityFixtures: FixtureStore = {
         loadState: "loaded",
       },
     },
+    {
+      kind: "sandbox-service",
+      origin: "sandboxd",
+      unitName: "lab-cache.service",
+      unitType: "service",
+      state: "inactive",
+      subState: "dead",
+      loadState: "loaded",
+      slice: "sandboxd.slice",
+      description: "Sandboxd managed stopped cache service",
+      labels: {
+        source: "sandboxd",
+      },
+      sandboxProfile: "baseline",
+      capabilities: createCapabilities("sandboxd", "inactive"),
+      resourceControls: {
+        cpuWeight: "100",
+        memoryMax: "256M",
+      },
+      sandboxing: {
+        noNewPrivileges: true,
+        privateTmp: true,
+      },
+      status: {
+        activeState: "inactive",
+        subState: "dead",
+        loadState: "loaded",
+      },
+    },
   ],
   "external-only": [
     {
