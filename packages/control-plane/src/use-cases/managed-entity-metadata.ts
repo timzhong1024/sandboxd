@@ -21,7 +21,10 @@ export function mergeSummaryWithMetadata(
     slice: metadata.slice ?? summary.slice,
     description: metadata.description ?? summary.description,
     sandboxProfile: metadata.sandboxProfile ?? summary.sandboxProfile,
-    resourceControls: mergeObjectPreferringPrimary(summary.resourceControls, metadata.resourceControls),
+    resourceControls: mergeObjectPreferringPrimary(
+      summary.resourceControls,
+      metadata.resourceControls,
+    ),
     sandboxing: mergeObjectPreferringPrimary(summary.sandboxing, metadata.sandboxing),
     capabilities: getManagedEntityCapabilities({
       origin: "sandboxd",
@@ -42,7 +45,10 @@ export function mergeDetailWithMetadata(
 
   return enrichManagedEntityDetail({
     ...mergeSummaryWithMetadata(detail, metadata),
-    resourceControls: mergeObjectPreferringPrimary(detail.resourceControls, metadata.resourceControls),
+    resourceControls: mergeObjectPreferringPrimary(
+      detail.resourceControls,
+      metadata.resourceControls,
+    ),
     sandboxing: mergeObjectPreferringPrimary(detail.sandboxing, metadata.sandboxing),
     advancedProperties: mergeObjectPreferringPrimary(
       detail.advancedProperties,
@@ -56,7 +62,7 @@ export function mergeDetailWithMetadata(
 function mergeObjectPreferringPrimary<T extends Record<string, unknown>>(
   primary: T | undefined,
   secondary: T | undefined,
-) : T {
+): T {
   if (!primary) {
     return (secondary ?? {}) as T;
   }
