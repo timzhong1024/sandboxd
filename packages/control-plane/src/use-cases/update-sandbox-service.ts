@@ -28,6 +28,7 @@ export function createUpdateSandboxService({
     input: CreateSandboxServiceInput,
   ): Promise<ManagedEntityDetail> {
     const entity = await inspectManagedEntity(unitName);
+    const shouldRestart = entity.status.activeState === "active";
     if (entity.origin !== "sandboxd" || entity.kind !== "sandbox-service") {
       throw new ManagedEntityConflictError(`Managed entity cannot be updated: ${unitName}`);
     }
@@ -48,6 +49,9 @@ export function createUpdateSandboxService({
     try {
       await systemdRuntime.updateSandboxService(unitName, input);
       await metadataSource.updateManagedEntityMetadata(unitName, input);
+      if (shouldRestart) {
+        await systemdRuntime.restartUnit(unitName);
+      }
       return await inspectManagedEntity(unitName);
     } catch (error: unknown) {
       if (!shouldFallbackToMetadata(error)) {

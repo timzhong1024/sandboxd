@@ -119,6 +119,70 @@ test("merges managed metadata into runtime details", async () => {
   });
 });
 
+test("prefers runtime-backed properties over duplicated metadata declarations", async () => {
+  const metadataSource = createMetadataSource();
+  metadataSource.getManagedEntityMetadata = vi.fn().mockResolvedValue({
+    unitName: "lab-api.service",
+    sandboxProfile: "strict",
+    resourceControls: {
+      cpuWeight: "200",
+    },
+    sandboxing: {
+      noNewPrivileges: true,
+    },
+    advancedProperties: {
+      CPUWeight: {
+        parsed: {
+          kind: "value",
+          value: 200,
+        },
+      },
+      NoNewPrivileges: {
+        parsed: true,
+      },
+    },
+    slice: "sandboxd.slice",
+  });
+  const runtime = createRuntime({
+    getUnit: vi.fn().mockResolvedValue({
+      unitName: "lab-api.service",
+      loadState: "loaded",
+      activeState: "active",
+      subState: "running",
+      description: "Sandboxd managed lab API",
+      slice: "sandboxd.slice",
+      resourceControls: {
+        cpuWeight: "200",
+      },
+      sandboxing: {
+        noNewPrivileges: true,
+      },
+    }),
+  });
+
+  const inspectManagedEntity = createInspectManagedEntity({
+    metadataSource,
+    systemdRuntime: runtime,
+  });
+
+  await expect(inspectManagedEntity("lab-api.service")).resolves.toMatchObject({
+    validation: {
+      errors: [],
+    },
+    advancedProperties: {
+      CPUWeight: {
+        parsed: {
+          kind: "value",
+          value: 200,
+        },
+      },
+      NoNewPrivileges: {
+        parsed: true,
+      },
+    },
+  });
+});
+
 test("surfaces runtime lookup failures instead of serving fixture data", async () => {
   const metadataSource = createMetadataSource();
   const runtimeError = new Error("Unit lab-api.service not found.");

@@ -111,6 +111,52 @@ test("updates sandbox services through runtime and metadata", async () => {
       execStart: "/usr/bin/node server.js",
     }),
   );
+  expect(systemdRuntime.restartUnit).not.toHaveBeenCalled();
+});
+
+test("restarts active sandbox services after updating their unit file", async () => {
+  const metadataSource = createMetadataSource();
+  const systemdRuntime = createRuntime({
+    getUnit: vi
+      .fn()
+      .mockResolvedValueOnce({
+        unitName: "lab-api.service",
+        loadState: "loaded",
+        activeState: "active",
+        subState: "running",
+        description: "Sandboxd managed lab API",
+        slice: "sandboxd.slice",
+        resourceControls: {},
+        sandboxing: {},
+      })
+      .mockResolvedValueOnce({
+        unitName: "lab-api.service",
+        loadState: "loaded",
+        activeState: "active",
+        subState: "running",
+        description: "Sandboxd managed lab API",
+        slice: "sandboxd.slice",
+        resourceControls: {},
+        sandboxing: {},
+      }),
+  });
+  const updateSandboxService = createUpdateSandboxService({
+    metadataSource,
+    systemdRuntime,
+  });
+
+  await expect(
+    updateSandboxService("lab-api.service", {
+      name: "lab-api",
+      execStart: "/usr/bin/node server.js",
+      sandboxProfile: "baseline",
+    }),
+  ).resolves.toMatchObject({
+    unitName: "lab-api.service",
+    state: "active",
+  });
+
+  expect(systemdRuntime.restartUnit).toHaveBeenCalledWith("lab-api.service");
 });
 
 test("rejects updates for inspect-only entities", async () => {
